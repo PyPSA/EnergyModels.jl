@@ -1,5 +1,11 @@
 module EnergyModels
 
-# package code goes here
+using JuMP
+
+# include("io.jl")
+
+include("structs.jl")
+
+
 
 end # module
