@@ -1,11 +1,13 @@
 module EnergyModels
 
+using Compat
 using JuMP
 
-# include("io.jl")
+export @emvariable, @emconstraint, Component, EnergyModel, Generator
 
-include("structs.jl")
-
-
+include("types.jl")
+include("macros.jl")
+include("data.jl")
+include("struct.jl")
 
 end # module
