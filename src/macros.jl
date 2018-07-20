@@ -1,14 +1,15 @@
 using MacroTools: prewalk, @capture, @match
 
-using JuMP: var_cats, esc_nonconstant, variable_error, getname, addkwargs!,
-    constructvariable!, buildrefsets, isdependent, variabletype, getloopedcode,
-    validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar,
-    storecontainerdata, constraint_error, _canonicalize_sense, registercon,
-    parseExprToplevel
+using JuMP: esc_nonconstant, macro_error, getname, addkwargs!
+    # constructvariable!, buildrefsets, isdependent, variabletype, getloopedcode,
+    # validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar,
+    # storecontainerdata, _canonicalize_sense, registercon, parseExprToplevel
 
 using NamedTuples
 
 using Base.Meta: isexpr, quot
+
+const var_cats = [:Cont, :Int, :Bin, :SemiCont, :SemiInt]
 
 """
     extract_and_verify_model(c)
@@ -95,7 +96,7 @@ Example:
 ```
 """
 macro emvariable(c, args...)
-    _error(str) = variable_error(args, str)
+    _error(str) = macro_error(:variable, args, str)
     args = collect(args)
 
     kwargs = filter(x->isexpr(x, :(=)), args)
