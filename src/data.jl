@@ -134,6 +134,15 @@ function PypsaNcData(ds)
         @NT(variant = squeeze(convert(Array{Bool}{2}, df[1,2:end]), 1),
             index = df[:inds])
     end
+
+    components = CSV.read(joinpath(@__DIR__, 'pypsa.generators.csv'))
+    Dict()
+    for c = classes, attr = attrs
+        inds = findin(ds[string(listname, "_t_", attr, "_i")], ds[string(listname, "_i")][c.inds])
+        if length(inds) == 0 continue end
+        @assert length(inds) == length(c.inds)
+
+    end
 end
 
 function NcData(filename::String)
