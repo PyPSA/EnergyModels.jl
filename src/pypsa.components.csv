@@ -1,0 +1,8 @@
+componenttype,listname
+Bus,buses
+Generator,generators
+StorageUnit,storage_units
+Store,store
+Link,links
+Line,lines
+Transformer,transformers
