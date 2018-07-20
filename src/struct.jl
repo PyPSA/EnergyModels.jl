@@ -9,6 +9,9 @@ build(::Model, ::Component) = error("Not implemented")
 build(::Component) = error("Not implemented")
 
 abstract type OnePortComponent <: Component end
+abstract type AggregateComponent <: Component end
+abstract type BranchComponent <: Component end
+abstract type PassiveBranchComponent <: BranchComponent end
 
 struct Generator <: OnePortComponent
     model::EnergyModel
@@ -59,27 +62,39 @@ cost(m::Model, c::Generator) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_
 #     end
 # end
 
-function build(m::Model, c::Generator)
-    G = indexset(c, :generators)
-    T = indexset(c, :snapshots)
+# function build(m::Model, c::Generator)
+#     G = indexset(c, :generators)
+#     T = indexset(c, :snapshots)
 
-    if c[:p_nom_extendable]
-        @emvariable c c[:p_nom_min][g] <= p_nom[g=G] <= c[:p_nom_max][g]
-        @emvariable c p[g=G,t=T]
-        @emconstraint c balancing_lb[g=G,t=T] p[g,t] >= c[:p_min_pu][g,t] * c[:p_nom][g]
-        @emconstraint c balancing_ub[g=G,t=T] p[g,t] <= c[:p_max_pu][g,t] * c[:p_nom][g]
-    else
-        @emvariable c c[:p_min_pu][g,t] * c[:p_nom][g] <= p[g=G,t=T] <= c[:p_min_pu][g,t] * c[:p_nom][g]
-    end
-end
+#     if c[:p_nom_extendable]
+#         @emvariable c c[:p_nom_min][g] <= p_nom[g=G] <= c[:p_nom_max][g]
+#         @emvariable c p[g=G,t=T]
+#         @emconstraint c balancing_lb[g=G,t=T] p[g,t] >= c[:p_min_pu][g,t] * c[:p_nom][g]
+#         @emconstraint c balancing_ub[g=G,t=T] p[g,t] <= c[:p_max_pu][g,t] * c[:p_nom][g]
+#     else
+#         @emvariable c c[:p_min_pu][g,t] * c[:p_nom][g] <= p[g=G,t=T] <= c[:p_min_pu][g,t] * c[:p_nom][g]
+#     end
+# end
 
 
-struct QAxis{name,N} end
+# struct QAxis{name,N} end
 
-struct Quantity{name,isvar,N,Ax}
-    Quantity{name,isvar,N,Ax}() where {name,isvar<:Bool,N,Ax<:Tuple{Vararg{QAxis,N}}} = new{name,isvar,N,Ax}()
-end
+# struct Quantity{name,isvar,N,Ax}
+#     Quantity{name,isvar,N,Ax}() where {name,isvar<:Bool,N,Ax<:Tuple{Vararg{QAxis,N}}} = new{name,isvar,N,Ax}()
+# end
 
 struct Load <: OnePortComponent
+    class::Symbol
+end
+
+struct Bus <: Component
+    class::Symbol
+end
+
+struct StorageUnit <: OnePortComponent
+    class::Symbol
+end
+
+struct Store <: OnePortComponent
     class::Symbol
 end
