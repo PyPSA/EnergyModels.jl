@@ -1,9 +1,11 @@
 using DataFrames
 using CSV
+using Missings
 
 struct PypsaAttrInfo
     pypsaname::String
     indices::Union{Colon,UnitRange{Int64},StepRange{Int64,Int64},Vector{Int64}}
+    default::Union{Missing,Float64,Bool,String,Int64}
 end
 
 struct PypsaClassInfo
@@ -50,7 +52,7 @@ function pypsaclassinfos(ds, listname)
 
         for attr = eachrow(attrs)
             attrname_t = string(listname, "_t_", attr[:PyPSA])
-            if attr[:time_dependent] && in(attrname_t * "_i", ds)
+            if attr[:time_dependent] && haskey(ds, attrname_t * "_i")
                 indices_t = findin(ds[attrname_t * "_i"], names)
             else
                 indices_t = Int64[]
@@ -60,9 +62,9 @@ function pypsaclassinfos(ds, listname)
                 if length(indices_t) > 0
                     @assert(length(indices_t) == length(names),
                             "$listname::$class has static and time-dependent $(attr[:PyPSA])")
-                    PypsaAttrInfo(attrname_t, indices_t)
+                    PypsaAttrInfo(attrname_t, indices_t, attr[:default])
                 else
-                    PypsaAttrInfo(string(listname, "_", attr[:PyPSA]), indices)
+                    PypsaAttrInfo(string(listname, "_", attr[:PyPSA]), indices, attr[:default])
                 end
         end
 
@@ -172,16 +174,24 @@ function Base.get(data::PypsaNcData, component::Component, class::Symbol, param:
     classinfo = data.classinfos[name][class]
     attrinfo = classinfo.attrinfos[param]
 
-    da = data.dataset[attrinfo.pypsaname]
-    dims = dimnames(da)[2:end]
+    if !haskey(data.dataset, attrinfo.pypsaname)
+        AxisArray(fill(attrinfo.default, length(classinfo.names)),
+                  Axis{Symbol(name)}(classinfo.names))
+    else
+        da = data.dataset[attrinfo.pypsaname]
+        dims = dimnames(da)[2:end]
 
-    # Benchmarking shows that getting the full array first and then
-    # subsetting is faster even if we need to get only 1 or 2 lines
-    # We would need to improve NCDatasets first!
-    AxisArray(da[:][attrinfo.indices,ntuple(i->:,length(dims))...],
-              Axis{Symbol(name)}(classinfo.names),
-              (axis(data, n) for n = dims)...)
+        # Benchmarking shows that getting the full array first and then
+        # subsetting is faster even if we need to get only 1 or 2 lines
+        # We would need to improve NCDatasets first!
+        AxisArray(da[:][attrinfo.indices,ntuple(i->:,length(dims))...],
+                  Axis{Symbol(name)}(classinfo.names),
+                  (axis(data, n) for n = dims)...)
+    end
 end
+
+isvar(data::PypsaNcData, component::Component, class::Symbol, param::Symbol) =
+    in(param, data.classinfos[naming(component)][class].variables)
 
 function axis(data::PypsaNcData, c::Component, class)
     name = naming(c)

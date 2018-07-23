@@ -2,10 +2,10 @@ EM,PyPSA,variable_switch,time_dependent,default
 bus0,bus0,,,
 bus1,bus1,,,
 type,type,,,
-num_parallel,num_parallel,,,1
-length,length,,,0
-s_nom,s_nom,s_nom_extendable,,0
-s_nom_min,s_nom_min,,,0
+num_parallel,num_parallel,,,1.
+length,length,,,0.
+s_nom,s_nom,s_nom_extendable,,0.
+s_nom_min,s_nom_min,,,0.
 s_nom_max,s_nom_max,,,Inf
-s_max_pu,s_max_pu,,t,1
-capital_cost,capital_cost,,,0
+s_max_pu,s_max_pu,,t,1.
+capital_cost,capital_cost,,,0.
