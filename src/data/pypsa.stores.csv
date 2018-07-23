@@ -1,0 +1,12 @@
+EM,PyPSA,variable_switch,time_dependent,default
+bus,bus,,,
+e_nom,e_nom,e_nom_extendable,,0
+e_max_pu,e_max_pu,,t,1
+e_min_pu,e_min_pu,,t,-1
+e_nom_min,e_nom_min,,,0
+e_nom_max,e_nom_max,,,Inf
+e_initial,e_initial,,,0
+e_cyclic,e_cyclic,,,f
+standing_loss,standing_loss,,,0
+marginal_cost,marginal_cost,,t,0
+capital_cost,capital_cost,,,0

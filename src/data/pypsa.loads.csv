@@ -1,0 +1,3 @@
+EM,PyPSA,time_dependent,default
+bus,bus,,
+p_set,p_set,t,0
