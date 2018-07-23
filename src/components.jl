@@ -1,98 +1,57 @@
-module Components
+EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
+EnergyModel(data::Data; solver=GurobiSolver()) = load(EnergyModel(Dict{Symbol,Component}(), data, Model(solver=solver)))
 
-export
-  EnergyModel, Bus, Generator, Load, StorageUnit, Store, Link, Line,
-  build, indexset, view, jumpmodel, expression
-
-mutable struct EnergyModel
-  components::Dict{Symbol,Component}
-  data::Data
-  jump::Model
-  cache::Dict{Symbol,Any}
+function load(m::EnergyModel)
+    for T = components(m.data), clas = classes(m.data, T)
+        m.components[Symbol(string(naming(T), "::", clas))] = T(m, clas, Dict{Symbol}{Any}(), Dict{Symbol}{Any}())
+    end
+    m
 end
+
+Base.show(io::IO, c::Component) = print(io, typeof(c), " for class ", c.class)
+function Base.show(io::IO, ::MIME"text/plain", c::Component)
+    println(io, c, " with ")
+    println(io, "* ", length(c.vars), " variables")
+    print(io, "* ", length(c.constrs), " constraints")
+end
+
 
 build(::Model, ::Component) = error("Not implemented")
 build(::Component) = error("Not implemented")
-
-abstract type AggregateComponent <: Component end
-
-# OnePortComponents
-abstract type OnePortComponent <: Component end
-for component = (:Generator, :Load, :StorageUnit, :Store)
-  @eval begin
-      struct $component <: OnePortComponent
-          model::EnergyModel
-          class::Symbol
-          vars::Dict{Symbol, Any}
-          constrs::Dict{Symbol, Any}
-      end
-  end
-end
-
-# BranchComponents
-abstract type BranchComponent <: Component end
-
-# ActiveBranchComponents
-abstract type ActiveBranchComponent <: BranchComponent end
-struct Link <: ActiveBranchComponent
-  model::EnergyModel
-  class::Symbol
-  vars::Dict{Symbol, Any}
-  constrs::Dict{Symbol, Any}
-end
-
-# PassiveBranchComponent
-abstract type PassiveBranchComponent <: BranchComponent end
-for component = (:Line, :Transformer)
-  @eval begin
-      struct $component <: PassiveBranchComponent
-          model::EnergyModel
-          class::Symbol
-          vars::Dict{Symbol, Any}
-          constrs::Dict{Symbol, Any}
-      end
-  end
-end
-
-# AggregateComponents
-struct SubNetwork <: AggregateComponent
-  model::EnergyModel
-  class::Symbol
-  vars::Dict{Symbol, Any}
-  constrs::Dict{Symbol, Any}
-end
-
-
-abstract type ExpressionType end
-abstract type Emission <: ExpressionType end
-struct Cost <: ExpressionType end
-struct CO2 <: Emission end
 
 jumpmodel(c::Component) = c.model.jump
 expression(c::Component, ::ExpressionType) = error("Not implemented")
 expression(c::Component, ::Cost) = cost(c)
 cost(::Component) = error("Not implemented")
 
-struct IndexSet{T} <: AbstractArray{T, 1}
-  name::Symbol
-  values::Vector{T}
+struct IndexSet{T} <: AbstractArray{eltype(T), 1}
+    name::Symbol
+    values::T
 end
-
-Base.size(set::IndexSet) = Base.size(set.values)
-Base.IndexStyle(::Type{<:IndexSet{T}}) where T = Base.IndexStyle(Vector{T})
-Base.getindex(set::IndexSet, i) = set.values[i]
+IndexSet(ax::Axis{name}) where name = IndexSet(name, ax.val)
+Base.getindex(set::IndexSet, i...) = set.values[i...]
+Base.eltype(::Type{IndexSet{T}}) where T = eltype(T)
+Base.size(set::IndexSet) = size(set.values)
+Base.endof(set::IndexSet) = length(set.values)
+Base.indices(set::IndexSet) = indices(set.values)
+Base.indices(set::IndexSet, d) = indices(set.values, d)
+Base.length(set::IndexSet) = length(set.values)
 
 Base.getindex(c::Component, attr::Symbol) = haskey(c.vars, attr) ? c.vars[attr] : get(c.model.data, c, c.class, attr)
 
-# We should use the sets information to make sure, we're getting the correct bit
-view(c::Component, attr::Symbol, sets::Vector{IndexSet{T}}) where T = c[attr]
-indexset(c::Component, attr::Symbol) = IndexSet(attr, c[attr])
+# TODO Use the indexsets information to make sure, we're getting the correct bit
+view(c::Component, attr::Symbol, axes::Vector{Axis}) = WrappedArray(c[attr], axes...)
+
+axis(c::Component) = axis(c.model.data, c, c.class)
+axis(c::Component, attr) = axis(c.model.data, attr)
+indexset(c::Component) = IndexSet(axis(c))
+indexset(c::Component, attr) = IndexSet(axis(c, attr))
 
 cost(m::Model, c::Generator) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:p_nom])
 
 function build(c::Generator)
-  G = indexset(c, :generators)
-  T = indexset(c, :snapshots)
+  G = axis(c, :generators)
+  T = axis(c, :snapshots)
 
   if c[:p_nom_extendable]
       @emvariable c c[:p_nom_min][g] <= p_nom[g=G] <= c[:p_nom_max][g]
@@ -103,6 +62,3 @@ function build(c::Generator)
       @emvariable c c[:p_min_pu][g,t] * c[:p_nom][g] <= p[g=G,t=T] <= c[:p_min_pu][g,t] * c[:p_nom][g]
   end
 end
-
-
-end # of module Components
