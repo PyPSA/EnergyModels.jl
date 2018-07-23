@@ -2,8 +2,8 @@ using MacroTools: prewalk, @capture, @match
 
 using JuMP: esc_nonconstant, variable_error, constraint_error, getname, addkwargs!,
     constructvariable!, buildrefsets, isdependent, variabletype, getloopedcode,
-    validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar,
-    storecontainerdata, _canonicalize_sense, registercon, parseExprToplevel
+    validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar, JuMPArray,
+    storecontainerdata, _canonicalize_sense, registercon, parseExprToplevel, pushmeta!
 
 using NamedTuples
 
@@ -37,8 +37,8 @@ function extract_component_vars!(code, c, ex, axes=nothing)
 
     function pullout(T, S)
         v = gensym()
-        reprs = (axes !== nothing && S !== nothing) ? (maybe_escape.(getindex.(axes, S))...) : ()
-        push!(code.args, :($(esc(v)) = view($(esc(c)), $T, $reprs)))
+        reprs = (axes !== nothing && S !== nothing) ? maybe_escape.(getindex.(axes, S)) : []
+        push!(code.args, :($(esc(v)) = view($(esc(c)), $T, ($(reprs...),))))
         S === nothing ? v : Expr(:ref, v, S...)
     end
 
@@ -50,7 +50,7 @@ struct AxisRepr
     name::Union{Nothing,Symbol}
 end
 
-maybe_escape(idx::AxisRepr) = idx.name === nothing ? esc(idx.set) : idx.set
+maybe_escape(idx::AxisRepr) = idx.name === nothing ? esc(idx.axis) : idx.axis
 
 function embuildrefsets!(initcode, c, var, escvarname)
     refcall, idxvars, idxsets, idxpairs, condition = buildrefsets(var, escvarname)
