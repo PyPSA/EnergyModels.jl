@@ -24,19 +24,6 @@ expression(c::Component, ::ExpressionType) = error("Not implemented")
 expression(c::Component, ::Cost) = cost(c)
 cost(::Component) = error("Not implemented")
 
-struct IndexSet{T} <: AbstractArray{eltype(T), 1}
-    name::Symbol
-    values::T
-end
-IndexSet(ax::Axis{name}) where name = IndexSet(name, ax.val)
-Base.getindex(set::IndexSet, i...) = set.values[i...]
-Base.eltype(::Type{IndexSet{T}}) where T = eltype(T)
-Base.size(set::IndexSet) = size(set.values)
-Base.endof(set::IndexSet) = length(set.values)
-Base.indices(set::IndexSet) = indices(set.values)
-Base.indices(set::IndexSet, d) = indices(set.values, d)
-Base.length(set::IndexSet) = length(set.values)
-
 Base.getindex(c::Component, attr::Symbol) = haskey(c.vars, attr) ? c.vars[attr] : get(c.model.data, c, c.class, attr)
 
 # TODO Use the indexsets information to make sure, we're getting the correct bit
@@ -44,8 +31,6 @@ view(c::Component, attr::Symbol, axes::Vector{Axis}) = WrappedArray(c[attr], axe
 
 axis(c::Component) = axis(c.model.data, c, c.class)
 axis(c::Component, attr) = axis(c.model.data, attr)
-indexset(c::Component) = IndexSet(axis(c))
-indexset(c::Component, attr) = IndexSet(axis(c, attr))
 
 cost(m::Model, c::Generator) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:p_nom])
 
