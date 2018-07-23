@@ -1,9 +1,9 @@
 using MacroTools: prewalk, @capture, @match
 
-using JuMP: esc_nonconstant, macro_error, getname, addkwargs!
-    # constructvariable!, buildrefsets, isdependent, variabletype, getloopedcode,
-    # validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar,
-    # storecontainerdata, _canonicalize_sense, registercon, parseExprToplevel
+using JuMP: esc_nonconstant, variable_error, constraint_error, getname, addkwargs!,
+    constructvariable!, buildrefsets, isdependent, variabletype, getloopedcode,
+    validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar,
+    storecontainerdata, _canonicalize_sense, registercon, parseExprToplevel
 
 using NamedTuples
 
@@ -32,48 +32,48 @@ end
 Look for c[_Symbol] and c[_Symbol][__] and pull out the represented data into a
 view in the expression block in `code`.
 """
-function extract_component_vars!(code, c, ex, indexsets=nothing)
+function extract_component_vars!(code, c, ex, axes=nothing)
     @assert isexpr(code, :block)
 
     function pullout(T, S)
         v = gensym()
-        reprs = indexsets !== nothing && S !== nothing ? maybe_escape.(getindex.(indexsets, S)) : []
-        push!(code.args, :($(esc(v)) = view($(esc(c)), $T, [$(reprs...)])))
+        reprs = (axes !== nothing && S !== nothing) ? (maybe_escape.(getindex.(axes, S))...) : ()
+        push!(code.args, :($(esc(v)) = view($(esc(c)), $T, $reprs)))
         S === nothing ? v : Expr(:ref, v, S...)
     end
 
     prewalk(x -> @capture(x, c[T_][S__] | c[T_]) ? pullout(T, S) : x, ex)
 end
 
-struct IndexSetRepr
-    set::Union{Symbol,Expr}
-    name::Union{Void,Symbol}
+struct AxisRepr
+    axis::Union{Symbol,Expr}
+    name::Union{Nothing,Symbol}
 end
 
-maybe_escape(idx::IndexSetRepr) = idx.name === nothing ? esc(idx.set) : idx.set
+maybe_escape(idx::AxisRepr) = idx.name === nothing ? esc(idx.set) : idx.set
 
 function embuildrefsets!(initcode, c, var, escvarname)
     refcall, idxvars, idxsets, idxpairs, condition = buildrefsets(var, escvarname)
 
-    idxsetreprs = Dict{Symbol,IndexSetRepr}()
+    axisreprs = Dict{Symbol,AxisRepr}()
     for (i, idxpair) = enumerate(idxpairs)
         if isexpr(idxpair.idxset, :quote)
             s = gensym()
             name = idxpair.idxset.args[1]
             idxpair.idxset = idxsets[i] = s
-            push!(initcode.args, :($s = indexset($(esc(c)), $(quot(name)))))
+            push!(initcode.args, :($s = axis($(esc(c)), $(quot(name)))))
 
-            idxsetrepr = IndexSetRepr(s, name)
+            axisrepr = AxisRepr(s, name)
         else
-            idxsetrepr = IndexSetRepr(idxpair.idxset, nothing)
+            axisrepr = AxisRepr(idxpair.idxset, nothing)
         end
 
         if idxpair.idxvar !== nothing
-            idxsetreprs[idxpair.idxvar] = idxsetrepr
+            axisreprs[idxpair.idxvar] = axisrepr
         end
     end
 
-    refcall, idxvars, idxsets, idxpairs, condition, idxsetreprs
+    refcall, idxvars, idxsets, idxpairs, condition, axisreprs
 end
 
 """
@@ -88,7 +88,7 @@ Additionally:
   component parameters
 
 * if the indexing sets are given as a symbol as in the example above, they are
-  resolved from the component data using `indexset(c, symb)`
+  resolved from the component data using `axis(c, symb)`
 
 Example:
 ```julia
@@ -96,7 +96,9 @@ Example:
 ```
 """
 macro emvariable(c, args...)
-    _error(str) = macro_error(:variable, args, str)
+    _error(str) = variable_error(args, str)
+    # _error(str) = macro_error(:variable, args, str)
+
     args = collect(args)
 
     kwargs = filter(x->isexpr(x, :(=)), args)
@@ -122,7 +124,7 @@ macro emvariable(c, args...)
     end
 
     for ex in args
-        if ex in JuMP.var_cats
+        if ex in var_cats
             @assert !haskey(p, :t) "Specified categories $(p.t) and $(ex)"
             parse = setindex(parse, :t, ex)
         end
@@ -181,10 +183,10 @@ macro emvariable(c, args...)
     elseif isa(var, Expr)
         # We now build the code to generate the variables (and possibly the JuMPDict
         # to contain them)
-        refcall, idxvars, idxsets, idxpairs, condition, idxsetreprs = embuildrefsets!(initcode, c, var, escvarname)
+        refcall, idxvars, idxsets, idxpairs, condition, axisreprs = embuildrefsets!(initcode, c, var, escvarname)
 
-        ub = esc_nonconstant(extract_component_vars!(initcode, c, ub, idxsetreprs))
-        lb = esc_nonconstant(extract_component_vars!(initcode, c, lb, idxsetreprs))
+        ub = esc_nonconstant(extract_component_vars!(initcode, c, ub, axisreprs))
+        lb = esc_nonconstant(extract_component_vars!(initcode, c, lb, axisreprs))
 
         # Code to be used to create each variable of the container.
         variablecall = :( constructvariable!($m, $(args...), $_error, $lb, $ub, $t, EMPTYSTRING, $value) )
@@ -243,7 +245,7 @@ macro emconstraint(c, args...)
 
     # Strategy: build up the code for non-macro addconstraint, and if needed
     # we will wrap in loops to assign to the ConstraintRefs
-    refcall, idxvars, idxsets, idxpairs, condition, idxsetreprs = embuildrefsets!(initcode, c, v, escvarname)
+    refcall, idxvars, idxsets, idxpairs, condition, axisreprs = embuildrefsets!(initcode, c, v, escvarname)
 
     # JuMP accepts constraint syntax of the form @constraint(m, foo in bar).
     # This will be rewritten to a call to constructconstraint!(foo, bar). To
@@ -265,7 +267,7 @@ macro emconstraint(c, args...)
         (sense,vectorized) = _canonicalize_sense(x.args[1])
         addconstr = (vectorized ? :addVectorizedConstraint : :addconstraint)
 
-        lhs = extract_component_vars!(initcode, c, :($(x.args[2]) - $(x.args[3])), idxsetreprs)
+        lhs = extract_component_vars!(initcode, c, :($(x.args[2]) - $(x.args[3])), axisreprs)
         newaff, parsecode = parseExprToplevel(lhs, :q)
         constraintcall = :($addconstr($m, constructconstraint!($newaff,$(quot(sense)))))
         addkwargs!(constraintcall, kwargs)
@@ -287,9 +289,9 @@ macro emconstraint(c, args...)
         lb_str = string(x.args[1])
         ub_str = string(x.args[5])
 
-        aff = extract_component_vars!(initcode, c, x.args[3], idxsetreprs)
-        lb  = extract_component_vars!(initcode, c, x.args[1], idxsetreprs)
-        ub  = extract_component_vars!(initcode, c, x.args[5], idxsetreprs)
+        aff = extract_component_vars!(initcode, c, x.args[3], axisreprs)
+        lb  = extract_component_vars!(initcode, c, x.args[1], axisreprs)
+        ub  = extract_component_vars!(initcode, c, x.args[5], axisreprs)
 
         newaff, parsecode = parseExprToplevel(aff, :aff)
         newlb, parselb = parseExprToplevel(lb, :lb)
