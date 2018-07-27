@@ -161,7 +161,7 @@ macro emvariable(c, args...)
     value = get(p, :value, NaN)
 
     escvarname = esc(getname(var))
-    quotvarname = quot(getname(var))
+    quotvarname = :(naming(Symbol, $(esc(c)), $(esc(c)).class, $(quot(getname(var)))))
 
     initcode = Expr(:block)
     m = extract_and_verify_model!(initcode, c)
@@ -230,7 +230,7 @@ macro emconstraint(c, args...)
 
     v, x = filter(x->!isexpr(x, :(=)), args)
 
-    quotvarname = quot(getname(v))
+    quotvarname = :(naming(Symbol, $(esc(c)), $(esc(c)).class, $(quot(getname(v)))))
     escvarname  = esc(getname(v))
 
     if isa(x, Symbol)

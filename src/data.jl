@@ -49,6 +49,7 @@ function load(filename::String)::Data
     end
 end
 
+naming(::Type{Symbol}, c::Component, symbols...) = Symbol(naming(c, symbols...))
 naming(::T, symbols...) where T<:Component = join((naming(T), string.(symbols)...), "::")
 function naming(::Type{T}) where T<:Component
     s = lowercase(string(T))

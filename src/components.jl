@@ -27,7 +27,11 @@ expression(c::Component, ::ExpressionType) = error("Not implemented")
 expression(c::Component, ::Cost) = cost(c)
 cost(::Component) = error("Not implemented")
 
-Base.getindex(c::Component, attr::Symbol) = isvar(c, attr) ? c.vars[attr] : get(c.model.data, c, c.class, attr)
+function Base.getindex(c::Component, attr::Symbol)
+    name = naming(Symbol, c, c.class, attr)
+    m = jumpmodel(c)
+    haskey(m.objDict, name) ? m.objDict[name] : get(c.model.data, c, c.class, attr)
+end
 
 # TODO probably introduce an indirection so that the array is only wrapped if extra axes are needed
 view(c::Component, attr::Symbol, axes) = WrappedArray(c[@show(attr)], axes...)
