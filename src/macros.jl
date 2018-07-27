@@ -1,9 +1,11 @@
 using MacroTools: prewalk, @capture, @match
 
-using JuMP: esc_nonconstant, variable_error, constraint_error, getname, addkwargs!,
-    constructvariable!, buildrefsets, isdependent, variabletype, getloopedcode,
-    validmodel, coloncheck, EMPTYSTRING, JuMPContainer, registervar, JuMPArray,
-    storecontainerdata, _canonicalize_sense, registercon, parseExprToplevel, pushmeta!
+using JuMP: addtoexpr_reorder, esc_nonconstant, variable_error,
+    constraint_error, getname, addkwargs!, constructvariable!, buildrefsets,
+    isdependent, variabletype, getloopedcode, validmodel, coloncheck,
+    EMPTYSTRING, JuMPContainer, registervar, storecontainerdata,
+    _canonicalize_sense, registercon, parseExprToplevel, pushmeta!,
+    addconstraint, constructconstraint!
 
 using NamedTuples
 
