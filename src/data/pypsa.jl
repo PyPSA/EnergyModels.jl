@@ -72,8 +72,8 @@ function pypsaclassinfos(ds, listname)
             for attr = eachrow(@views attrs[.!ismissing.(attrs[:variable_switch]), :])
                 switchname = string(listname, "_", attr[:variable_switch])
                 if !haskey(ds, switchname) continue end
-                isvariable = ds[switchname][indices]
-                if any(isvariable)
+                isvariable = ds[switchname][:][indices]
+                if any(isvariable .== 1)
                     @assert all(isvariable) "$(attr[:variable_switch]) of $listname::$class must either be true or false (not both)"
                     push!(variables, attr[:EM])
                 end

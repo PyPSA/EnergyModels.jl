@@ -2,18 +2,18 @@ EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...
 EnergyModel(data::Data; solver=GurobiSolver()) = load(EnergyModel(Dict{Symbol,Component}(), data, Model(solver=solver)))
 
 function load(m::EnergyModel)
-    for T = components(m.data), clas = classes(m.data, T)
-        m.components[Symbol(string(naming(T), "::", clas))] = T(m, clas, Dict{Symbol}{Any}(), Dict{Symbol}{Any}())
+    for T = components(m.data), class = classes(m.data, T)
+        m.components[Symbol(string(naming(T), "::", class))] = T(m, class)
     end
     m
 end
 
 Base.show(io::IO, c::Component) = print(io, typeof(c), " for class ", c.class)
-function Base.show(io::IO, ::MIME"text/plain", c::Component)
-    println(io, c, " with ")
-    println(io, "* ", length(c.vars), " variables")
-    print(io, "* ", length(c.constrs), " constraints")
-end
+# function Base.show(io::IO, ::MIME"text/plain", c::Component)
+#     println(io, c, " with ")
+#     println(io, "* ", length(c.vars), " variables")
+#     print(io, "* ", length(c.constrs), " constraints")
+# end
 
 isvar(c::Component, attr::Symbol) = isvar(c.model.data, c, c.class, attr)
 
@@ -21,7 +21,7 @@ build(::Model, ::Component) = error("Not implemented")
 build(::Component) = error("Not implemented")
 
 jumpmodel(c::Component) = c.model.jump
-jumpmodel(m::EnergyModel) = c.jump
+jumpmodel(m::EnergyModel) = m.jump
 
 expression(c::Component, ::ExpressionType) = error("Not implemented")
 expression(c::Component, ::Cost) = cost(c)
@@ -34,7 +34,11 @@ function Base.getindex(c::Component, attr::Symbol)
 end
 
 # TODO probably introduce an indirection so that the array is only wrapped if extra axes are needed
-view(c::Component, attr::Symbol, axes) = WrappedArray(c[@show(attr)], axes...)
+view(c::Component, attr::Symbol, axes) = WrappedArray(c[attr], axes...)
+
+axis(m::EnergyModel, args...) = axis(m.data, args...)
+axis(c::Component) = axis(c.model, c, c.class)
+axis(c::Component, attr) = axis(c.model, attr)
 
 axis(c::Component) = axis(c.model.data, c, c.class)
 axis(c::Component, attr) = axis(c.model.data, attr)
