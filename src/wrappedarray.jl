@@ -1,16 +1,24 @@
 using Base: @propagate_inbounds, HasShape, HasEltype
 import AxisArrays: axisdim, axisnames, axisname, axisvalues
+import JuMP: JuMPArray
 
 struct WrappedArray{T,N,M,D,Ax} <: AbstractArray{T,N}
     data::D
     axes::Ax
-    function WrappedArray(data::AxisArray{T,M}, axes::NTuple{N,Axis}) where {T,N,M}
+    # Duck-typing, we assume axisnames is defined for data
+    function WrappedArray(data::Union{AxisArray{T,M},JuMP.JuMPArray{T,M}}, axes::NTuple{N,Axis}) where {T,N,M}
         @assert(issubset(axisnames(data), axisnames(axes...)),
                 "WrappedArray is missing axes: $(setdiff(axisnames(data), axisnames(axes...)))")
         new{T,N,M,typeof(data),typeof(axes)}(data, axes)
     end
 end
 WrappedArray(data, axes::Axis...) = WrappedArray(data, axes)
+# Not all axes are Axis, since we insist, you have to provide a function that
+# convert one for your iterator type by adding methods to this recursive
+# _to_axis
+WrappedArray(data, axes...) = WrappedArray(data, _to_axis(axes...)...)
+_to_axis(ax::Axis, axes...) = (ax, _to_axis(axes...)...)
+_to_axis() = ()
 
 @inline Base.size(A::WrappedArray) = length.(A.axes)
 @inline Base.size(A::WrappedArray, Ax::Axis) = length(A.axes[axisdim(A, Ax)])
