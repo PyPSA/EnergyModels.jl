@@ -1,4 +1,5 @@
 import AxisArrays: axisnames, axisvalues
+using LightGraphs: AbstractSimpleGraph
 
 # !!Type-piracy!! We should make the case to move these definitions to JuMP
 # Will be difficult as long as they use their one JuMPArray methods!
