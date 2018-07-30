@@ -98,12 +98,12 @@ function build(m::EnergyModel, c::StorageUnit)
         @emvariable c 0 <= state_of_charge[s=S,t=T] <= c[:max_hours][s,t] * c[:p_nom][s]
     end
 
-    @emvariable c 0 <= spill[s=S,t=T] <= c[:inflow][s=S,t=T]
+    @emvariable c 0 <= spill[s=S,t=T] <= c[:inflow][s,t]
 
     soc_prev = roll(c[:state_of_charge], :storageunits=>1)
     if !c[:cyclic_state_of_charge] soc_prev[:,1] = c[:state_of_charge_initial] end
 
-    @emconstraint(c, [s=S, t=T],
+    @emconstraint(c, soc_eq[s=S, t=T],
                   c[:state_of_charge][s,t] - soc_prev[s,t]
                   == c[:p_store][s,t] * c[:efficiency_store]
                   - c[:p_dispatch][s,t] / c[:efficiency_dispatch]
@@ -132,10 +132,8 @@ function build(m::EnergyModel, c::Store)
     e_prev = rol(c[:e], :stores=>1)
     if !c[:e_cyclic] e_prev[:,S[1]] = c[:e_initial] end
 
-    @emconstraint(c, [s=S, t=T],
-                  c[:e][s,t] - (1. - c[:standing_loss]) * e_prev[s,t] == c[:p]
-                  == c[:e_store][s,t] * c[:efficiency_store]
-                  - c[:e_dispatch][s,t] / c[:efficiency_dispatch])
+    @emconstraint(c, e_eq[s=S, t=T],
+                  c[:e][s,t] - (1. - c[:standing_loss]) * e_prev[s,t] == c[:p])
 end
 
 
