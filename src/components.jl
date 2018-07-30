@@ -29,13 +29,32 @@ expression(c::Component, ::ExpressionType) = error("Not implemented")
 expression(c::Component, ::Cost) = cost(c)
 cost(::Component) = error("Not implemented")
 
-cost(::EnergyModel, c::Component) = cost(c) # Allow one and two-argument forms
+# Allow one and two-argument forms
+cost(::EnergyModel, c::Component) = cost(c)
 build(::EnergyModel, c::Component) = build(c)
 
 function Base.getindex(c::Component, attr::Symbol)
     name = naming(Symbol, c, c.class, attr)
     m = jumpmodel(c)
     haskey(m.objDict, name) ? m.objDict[name] : get(c.model.data, c, c.class, attr)
+end
+
+@inline function add_nodal_balance!(balance, bus, expressions)
+    components, = axisvalues(bus)
+    for i = eachindex(bus)
+        balance[bus[i],:] .+= expressions[components[i],:]
+    end
+    balance
+end
+
+# TODO the following definition only works for buses with class undef,
+# maybe the definition should live on the subnetwork anyway
+nodal_balance(m::EnergyModel) = nodal_balance(m, axis(m.components[Symbol("buses::undef")]))
+function nodal_balance(m::EnergyModel, buses::Axis)
+    T = axis(m, :snapshots)
+    balance = AxisArray(zeros(AffExpr, length.((buses, T))...), buses, T)
+    for c = m.components add_nodal_balance!(balance, c) end
+    balance
 end
 
 # TODO probably introduce an indirection so that the array is only wrapped if extra axes are needed
