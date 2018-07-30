@@ -61,3 +61,34 @@ end
 # iteration traits
 Base.iteratorsize(::Type{<:Axis}) = HasShape()
 Base.iteratoreltype(::Type{<:Axis}) = HasEltype()
+
+
+# RelIterators allow to use + Int, and - Int to get to adjacent indices, BUT
+# they are about a 100x slower, so should be used sparingly
+
+struct RelativeIndex{Ax}
+    ax::Ax
+    i::Int64
+end
+
+struct RelativeIterator{Ax}
+    ax::Ax
+end
+
+Base.start(it::RelativeIterator) = 1
+Base.done(it::RelativeIterator, state) = state == length(it.ax) + 1
+Base.next(it::RelativeIterator, state) = RelativeIndex(it.ax, state), state + 1
+Base.length(it::RelativeIterator) = length(it.ax)
+Base.:+(r::RelativeIndex, d::Int) = RelativeIndex(r.ax, r.i+d)
+Base.:-(r::RelativeIndex, d::Int) = RelativeIndex(r.ax, r.i-d)
+
+# We intercept the getindex calls of JuMPArray and AxisArray to resolve to the
+# actual index value
+for T = (:(JuMP.JuMPArray), :AxisArray)
+    @eval Base.getindex(a::$T, r::RelativeIndex) = a[r.ax[r.i]]
+end
+
+@inline unrelative(it) = it
+@inline unrelative(it::RelativeIterator) = it.ax
+
+_to_axis(it::RelativeIterator, axes...) = (unrelative(it), _to_axis(axes...)...)
