@@ -7,6 +7,14 @@ axisnames(::JuMP.JuMPArray{T,N,Ax}) where {T,N,Ax}       = AxisArrays._axisnames
 axisnames(::Type{JuMP.JuMPArray{T,N,Ax}}) where {T,N,Ax} = AxisArrays._axisnames(Ax)
 axisvalues(A::JuMP.JuMPArray) = axisvalues(A.indexsets...)
 
+function Base.circshift(A::AxisArray, shifts::Pair{Symbol,T}...) where T<:Integer
+    shiftamt = zeros(T, ndims(A))
+    for (ax,s) = shifts
+        shiftamt[axisdim(A, ax)] += s
+    end
+    Base.circshift(A, shiftamt)
+end
+
 # This was submitted as a PR to LightGraphs.jl and will be included in future versions. https://github.com/JuliaGraphs/LightGraphs.jl/pull/929
 # The LightGraph.jl version with the function only runs for Julia>v0.7. Therefore, the function is added for compatibility.
 
