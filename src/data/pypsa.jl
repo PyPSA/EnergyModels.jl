@@ -46,7 +46,7 @@ function pypsaclassinfos(ds, listname)
     attrs[:EM] = Symbol.(attrs[:EM])
 
     for (class, indices) = splitbyattr(ds, listname * "_carrier")
-        names = disallowmissing(ds[listname * "_i"][indices])
+        names = disallowmissing(ds[listname * "_i"][:][indices])
         attrinfos = Dict{Symbol}{PypsaAttrInfo}()
         variables = Set{Symbol}()
 
@@ -119,7 +119,7 @@ function PypsaNcData(ds)
 
         # Resolve julia types in the EnergyModels module (i'm not sure if that's
         # the most sensible way to do it)
-        ctype = getfield(EnergyModels, Symbol.(row[:componenttype]))
+        ctype = resolve(Symbol(row[:componenttype]))
 
         if !haskey(ds.dim, listname * "_i") || ds.dim[listname * "_i"] == 0
             continue
