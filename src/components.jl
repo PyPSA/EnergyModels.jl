@@ -50,9 +50,7 @@ end
     balance
 end
 
-# TODO the following definition only works for buses with class undef,
-# maybe the definition should live on the subnetwork anyway
-nodal_balance(m::EnergyModel) = nodal_balance(m, axis(m.components[Symbol("buses::undef")]))
+nodal_balance(m::EnergyModel) = nodal_balance(m, axis(m, :buses))
 function nodal_balance(m::EnergyModel, buses::Axis)
     T = axis(m, :snapshots)
     balance = AxisArray(zeros(AffExpr, length.((buses, T))...), buses, T)
@@ -62,6 +60,33 @@ end
 
 # TODO probably introduce an indirection so that the array is only wrapped if extra axes are needed
 view(c::Component, attr::Symbol, axes) = WrappedArray(c[attr], axes...)
+
+function axis(m::EnergyModel, attr::Symbol)
+    if attr == :buses
+        buses = collect(components(m, Bus))
+        @assert length(buses) == 1
+        axis(first(buses))
+    else
+        axis(m.data, attr)
+    end
+end
+
+function axis(sn::SubNetwork, attr::Symbol; ctype=PassiveBranchComponent)
+    if attr == :buses
+        Axis{:buses}(axis(sn.model, :buses)[sn.buses])
+    elseif attr == :branches
+        buses = axis(sn, :buses)
+        ax = Symbol[]
+        for c = components(sn.model, ctype)
+            inds = intersect(findin(c[:bus0], buses.val), findin(c[:bus1], buses.val))
+            append!(ax, naming.(Symbol, c, c.class, axis(c)[inds]))
+        end
+        Axis{:branches}(ax)
+    else
+        axis(sn.model, attr)
+    end
+end
+
 
 axis(m::EnergyModel, args...) = axis(m.data, args...)
 axis(c::Component) = axis(c.model, c, c.class)

@@ -55,4 +55,5 @@ abstract type AggregateComponent <: Component end
 struct SubNetwork <: AggregateComponent
     model::EnergyModel
     class::Symbol
+    buses::Vector{Int64}
 end
