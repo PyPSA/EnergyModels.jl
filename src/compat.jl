@@ -1,5 +1,6 @@
 import AxisArrays: axisnames, axisvalues
 using LightGraphs: AbstractSimpleGraph
+using Base: @propagate_inbounds, HasShape, HasEltype
 
 # !!Type-piracy!! We should make the case to move these definitions to JuMP
 # Will be difficult as long as they use their one JuMPArray methods!
@@ -14,6 +15,18 @@ function Base.circshift(A::AxisArray, shifts::Pair{Symbol,T}...) where T<:Intege
     end
     Base.circshift(A, shiftamt)
 end
+
+Base.indexin(a::AbstractArray, b::Axis) = indexin(a, b.val)
+
+# iteration on Axis
+@inline Base.start(A::Axis) = 1
+@propagate_inbounds Base.next(A::Axis, i) = (A[i], i+1)
+@propagate_inbounds Base.done(A::Axis, i) = length(A) + 1 == i
+
+# iteration traits
+Base.iteratorsize(::Type{<:Axis}) = HasShape()
+Base.iteratoreltype(::Type{<:Axis}) = HasEltype()
+
 
 # This was submitted as a PR to LightGraphs.jl and will be included in future versions. https://github.com/JuliaGraphs/LightGraphs.jl/pull/929
 # The LightGraph.jl version with the function only runs for Julia>v0.7. Therefore, the function is added for compatibility.

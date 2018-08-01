@@ -1,4 +1,3 @@
-using Base: @propagate_inbounds, HasShape, HasEltype
 import AxisArrays: axisdim, axisnames, axisname, axisvalues
 import JuMP: JuMPArray
 
@@ -52,16 +51,6 @@ axisvalues(A::WrappedArray) = axisvalues(A.axes...)
     names = axisnames(A)
     :($meta; A.data[$((Expr(:ref, :idxs, findfirst(names, n)) for n=axisnames(D))...)])
 end
-
-# iteration on Axis
-@inline Base.start(A::Axis) = 1
-@propagate_inbounds Base.next(A::Axis, i) = (A[i], i+1)
-@propagate_inbounds Base.done(A::Axis, i) = length(A) + 1 == i
-
-# iteration traits
-Base.iteratorsize(::Type{<:Axis}) = HasShape()
-Base.iteratoreltype(::Type{<:Axis}) = HasEltype()
-
 
 # RelIterators allow to use + Int, and - Int to get to adjacent indices, BUT
 # they are about a 100x slower, so should be used sparingly
