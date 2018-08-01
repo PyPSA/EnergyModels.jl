@@ -78,3 +78,40 @@ axis(data::AbstractNcData, n::String) = Axis{Symbol(n)}(disallowmissing(data.dat
 #
 # classes(data, ::Type{T}) where T<:Component
 # returns Array{Symbol} of the described classes
+
+
+struct DictData <: Data
+    axes::Dict{Symbol, Axis}
+    data::Dict{Symbol, AxisArray}
+    variables::Dict{Symbol, Set}
+    components::Vector{Tuple{Symbol, Symbol}}
+end
+
+DictData(; variables=Dict{Symbol,Set}(), kwargs...) = DictData(Dict(kwargs), variables=variables)
+function DictData(data::Dict{Symbol, AxisArray}; variables=Dict{Symbol,Set}())
+    axs = Dict{Symbol, Axis}()
+    for a = values(data),
+        ax = axes(a)
+
+        if haskey(axs, axisname(ax))
+            @assert axs[axisname(ax)] == ax
+        else
+            axs[axisname(ax)] = ax
+        end
+    end
+
+    components = unique((Symbol.(split(string(k), "::")[[1,2]])...) for k = keys(data))
+
+    DictData(axs, data, variables, components)
+end
+
+components(data::DictData) = resolve.(unique(typ for (typ, class) = data.components))
+classes(data::DictData, T) = classes(data, naming(Symbol, T))
+classes(data::DictData, ctype::Symbol) = (class for (typ, class) = data.components if typ == ctype)
+isvar(data::DictData, c::Component, class, quantity) = in(quantity, data.variables[naming(Symbol, c, class)])
+
+axis(data::DictData, n::Symbol) = data.axes[n]
+axis(data::DictData, n::String) = axis(data, Symbol(n))
+axis(data::DictData, c::Component, class) = axis(data, naming(Symbol, c, class))
+
+Base.get(data::DictData, c::Component, class, quantity) = data.data[naming(Symbol, c, class, quantity)]
