@@ -2,11 +2,14 @@ EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...
 EnergyModel(data::Data; solver=GurobiSolver()) = load(EnergyModel(Dict{Symbol,Component}(), data, Model(solver=solver)))
 
 function load(m::EnergyModel)
-    for T = components(m.data), class = classes(m.data, T)
-        m.components[Symbol(string(naming(T), "::", class))] = T(m, class)
-    end
+    for T = components(m.data), class = classes(m.data, T) push!(m, T(m, class)) end
     m
 end
+
+Base.push!(m::EnergyModel, c::Component) = (m.components[naming(Symbol, c, c.class)] = c)
+
+components(m::EnergyModel) = values(m.components)
+components(m::EnergyModel, T::Type{<:Component}) = (c for c = values(m.components) if isa(c, T))
 
 JuMP.solve(m::EnergyModel; kwargs...) = solve(m.jump; kwargs...)
 
@@ -63,6 +66,10 @@ view(c::Component, attr::Symbol, axes) = WrappedArray(c[attr], axes...)
 axis(m::EnergyModel, args...) = axis(m.data, args...)
 axis(c::Component) = axis(c.model, c, c.class)
 axis(c::Component, attr) = axis(c.model, attr)
+
+# Could be specialized to not have to retrieve the whole axis (on the other
+# hand, the axis should be cached, anyway)
+Base.length(c::Component) = length(axis(c))
 
 ## Defaults for OnePortComponents
 cost(c::OnePortComponent) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:p_nom])
