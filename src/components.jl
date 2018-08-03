@@ -203,3 +203,23 @@ function build(c::Line)
     @emvariable c -c[:s_max_pu][l,t] * c[:s_nom][l] <= p[l=L,t=:snapshots] <= c[:s_max_pu][l,t] * c[:s_nom][l]
 end
 
+function build(m::EnergyModel, c::Bus)
+    T = axis(m, :snapshots)
+    B = axis(c)
+    bal = nodal_balance(m, B)
+    @emconstraint(c, balance[B,T], bal .== 0)
+end
+
+function build(sn::SubNetwork)
+    T = axis(sn, :snapshots)
+    branches = components(sn, PassiveBranchComponent)
+    B = axis(branches)
+    p = view(branches, :p, (B, T))
+    x = view(branches, :x, (B,))
+
+    C = cycle_matrix(sn)
+    Cl = rowvals(C)
+    Cval = nonzeros(C)
+
+    @emconstraint(sn, cycles[c=1:size(C,2),t=T], sum(Cval[j] * x[Cl[j]] * p[Cl[j],T] for j=nzrange(C,c)) == 0)
+end

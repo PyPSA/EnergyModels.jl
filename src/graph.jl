@@ -4,10 +4,7 @@ struct EdgeInfo
 end
 
 graph(sn::SubNetwork; ctype=PassiveBranchComponent) = graph(sn.model, ctype=ctype, buses=axis(sn, :buses))
-function graph(m::EnergyModel; ctype=PassiveBranchComponent, buses=nothing)
-    if buses === nothing
-        buses = axis(m, :buses)
-    end
+function graph(m::EnergyModel; ctype=PassiveBranchComponent, buses=axis(m, :buses))
     g = MetaGraph(length(buses))
 
     for c = components(m, ctype),
@@ -46,7 +43,7 @@ function cycle_matrix(sn::SubNetwork; ctype=PassiveBranchComponent)
         branches = get_prop(g, e, :branches)
         b1 = first(branches)
         i1 = findfirst(ax, b1.name)
-        push!(IJV, (i1, j, b1.src == e.src ? +1 : -1))
+        push!(IJV, (i1, i, b1.src == e.src ? +1 : -1))
 
         for b = branches[2:end]
             push!(IJV, (i1, c, 1))
@@ -55,5 +52,5 @@ function cycle_matrix(sn::SubNetwork; ctype=PassiveBranchComponent)
         end
     end
 
-    sparse(destruct(IJV)...)
+    sparse(destruct(IJV)..., ne(g), length(cycles) + L - ne(g))
 end
