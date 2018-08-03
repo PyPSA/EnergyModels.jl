@@ -165,12 +165,6 @@ nodal_balance(c::Load) = - c[:p_set]
 build(c::Load) = nothing
 
 
-## Default for BranchComponents
-function add_nodal_balance!(balance, c::BranchComponent)
-    add_nodal_balance!(balance, c[:bus0], -c[:p])
-    add_nodal_balance!(balance, c[:bus1], c[:p])
-end
-
 ## Link
 function add_nodal_balance!(balance, c::Link)
     add_nodal_balance!(balance, c[:bus0], -c[:p])

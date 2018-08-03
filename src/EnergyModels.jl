@@ -14,7 +14,7 @@ using MetaGraphs
 include("types.jl")
 
 export
-    @emvariable, @emconstraint, components, push!,
+    @emvariable, @emconstraint, solve, components, push!,
     axis, graph, determine_subnetworks!,
     Component, EnergyModel, SubNetwork,
     Bus, Line, Link,

@@ -7,8 +7,6 @@ using JuMP: addtoexpr_reorder, esc_nonconstant, variable_error,
     _canonicalize_sense, registercon, parseExprToplevel, pushmeta!,
     addconstraint, constructconstraint!
 
-using NamedTuples
-
 using Base.Meta: isexpr, quot
 
 const var_cats = [:Cont, :Int, :Bin, :SemiCont, :SemiInt]

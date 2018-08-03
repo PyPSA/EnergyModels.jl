@@ -87,7 +87,7 @@ struct DictData <: Data
     components::Vector{Tuple{Symbol, Symbol}}
 end
 
-DictData(; variables=Dict{Symbol,Set}(), kwargs...) = DictData(Dict(kwargs), variables=variables)
+DictData(; variables=Dict{Symbol,Set}(), kwargs...) = DictData(Dict{Symbol,AxisArray}(kwargs), variables=variables)
 function DictData(data::Dict{Symbol, AxisArray}; variables=Dict{Symbol,Set}())
     axs = Dict{Symbol, Axis}()
     for a = values(data),
