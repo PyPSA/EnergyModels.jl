@@ -3,6 +3,10 @@ using JuMP: JuMPArray, addtoexpr, constructconstraint!
 using LightGraphs: AbstractSimpleGraph
 using Base: @propagate_inbounds, HasShape, HasEltype
 
+const typeparsers = Dict("float"=>float, "string"=>identity, "int"=>i->parse(Int, i),
+                         "bool"=>let d=Dict('t'=>true, 'f'=>false); i->d[first(i)] end)
+const typenames = Dict("float"=>Float64, "string"=>String, "int"=>Int64, "bool"=>Bool)
+
 # !!Type-piracy!! We should make the case to move these definitions to JuMP
 # Will be difficult as long as they use their one JuMPArray methods!
 axisnames(::JuMP.JuMPArray{T,N,Ax}) where {T,N,Ax}       = AxisArrays._axisnames(Ax)

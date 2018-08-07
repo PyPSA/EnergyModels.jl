@@ -1,3 +1,3 @@
-EM,PyPSA,time_dependent,default
-bus,bus,,
-p_set,p_set,t,0.
+EM,PyPSA,variable_switch,dimensions,default,type
+bus,bus,,static,,string
+p_set,p_set,,series,0,float
