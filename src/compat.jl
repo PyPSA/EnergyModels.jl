@@ -1,4 +1,5 @@
-import AxisArrays: axisnames, axisvalues
+import AxisArrays: AxisArray, axisdim, axisnames, axisvalues, CategoricalVector
+using JuMP: JuMPArray, addtoexpr, constructconstraint!
 using LightGraphs: AbstractSimpleGraph
 using Base: @propagate_inbounds, HasShape, HasEltype
 
@@ -8,13 +9,36 @@ axisnames(::JuMP.JuMPArray{T,N,Ax}) where {T,N,Ax}       = AxisArrays._axisnames
 axisnames(::Type{JuMP.JuMPArray{T,N,Ax}}) where {T,N,Ax} = AxisArrays._axisnames(Ax)
 axisvalues(A::JuMP.JuMPArray) = axisvalues(A.indexsets...)
 
-function Base.circshift(A::AxisArray, shifts::Pair{Symbol,T}...) where T<:Integer
-    shiftamt = zeros(T, ndims(A))
-    for (ax,s) = shifts
-        shiftamt[axisdim(A, ax)] += s
-    end
-    Base.circshift(A, shiftamt)
+function axisdim(::Type{JuMPArray{T,N,Ax}}, ::Type{<:Axis{name}}) where {T,N,Ax,name}
+    isa(name, Int) && return name <= N ? name : error("axis $name greater than array dimensionality $N")
+    names = axisnames(Ax)
+    idx = findfirst(names, name)
+    idx == 0 && error("axis $name not found in array axes $names")
+    idx
 end
+axisdim(A::JuMPArray, ax::Axis) = axisdim(A, typeof(ax))
+@generated function axisdim(A::JuMPArray, ax::Type{Ax}) where Ax<:Axis
+    dim = axisdim(A, Ax)
+    :($dim)
+end
+
+AxisArray(A::JuMPArray) = AxisArray(A.innerArray, A.indexsets...)
+
+function _shiftamt(A, shifts::Pair{Symbol,T}...) where T<:Integer
+    amt = zeros(T, ndims(A))
+    for (ax, s) = shifts
+        amt[axisdim(A, Axis{ax})] += s
+    end
+    amt
+end
+
+Base.circshift(A::AxisArray, shifts::Pair{Symbol,<:Integer}...) = circshift(A, _shiftamt(A, shifts...))
+function Base.circshift(A::JuMPArray, shifts::Pair{Symbol,<:Integer}...)
+    B = JuMPArray(circshift(A.innerArray, _shiftamt(A, shifts...)), A.indexsets)
+    merge!(B.meta, A.meta)
+    B
+end
+
 
 Base.indexin(a::AbstractArray, b::Axis) = indexin(a, b.val)
 
@@ -27,6 +51,8 @@ Base.indexin(a::AbstractArray, b::Axis) = indexin(a, b.val)
 Base.iteratorsize(::Type{<:Axis}) = HasShape()
 Base.iteratoreltype(::Type{<:Axis}) = HasEltype()
 
+# vcat definition for categorical vector
+Base.vcat(As::CategoricalVector...) = CategoricalVector(vcat(map(A -> A.data, As)...))
 
 # This was submitted as a PR to LightGraphs.jl and will be included in future versions. https://github.com/JuliaGraphs/LightGraphs.jl/pull/929
 # The LightGraph.jl version with the function only runs for Julia>v0.7. Therefore, the function is added for compatibility.

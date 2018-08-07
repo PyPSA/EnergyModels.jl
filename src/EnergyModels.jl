@@ -11,6 +11,9 @@ using AxisArrays
 using LightGraphs
 using MetaGraphs
 
+include("compat.jl")
+include("wrappedarray.jl")
+
 include("types.jl")
 
 export
@@ -20,8 +23,6 @@ export
     Bus, Line, Link,
     Generator, StorageUnit, Store
 
-include("compat.jl")
-include("wrappedarray.jl")
 include("graph.jl")
 include("macros.jl")
 include("components.jl")
