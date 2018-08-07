@@ -1,17 +1,17 @@
-struct EdgeInfo
-    name::Symbol
+struct EdgeInfo{T}
+    name::Tuple{Symbol,T}
     src::Int64
 end
 
-graph(sn::SubNetwork; ctype=PassiveBranchComponent) = graph(sn.model, ctype=ctype, buses=axis(sn, :buses))
-function graph(m::EnergyModel; ctype=PassiveBranchComponent, buses=axis(m, :buses))
+graph(sn::SubNetwork; ctype=PassiveBranch) = graph(sn.model, ctype=ctype, buses=axis(sn[Bus]))
+function graph(m::EnergyModel; ctype=PassiveBranch, buses=axis(m[Bus]))
     g = MetaGraph(length(buses))
+    b = m[ctype]
 
-    for c = components(m, ctype),
-        (n, u, v) = zip(axis(c), indexin(c[:bus0], buses), indexin(c[:bus1], buses))
+    for (n, u, v) = zip(axis(b), indexin(b[:bus0], buses), indexin(b[:bus1], buses))
         if u == 0 || v == 0 continue end
 
-        einfo = EdgeInfo(naming(Symbol, c, c.class, n), u)
+        einfo = EdgeInfo(n, u)
         if !add_edge!(g, u, v, :branches, [einfo])
             # edge already exists
             push!(get_prop(g, Edge(u, v), :branches), einfo)
@@ -22,14 +22,19 @@ function graph(m::EnergyModel; ctype=PassiveBranchComponent, buses=axis(m, :buse
 end
 
 function determine_subnetworks!(m::EnergyModel)
-    conn_comp = connected_components(graph(m))
-    for (i, b) = enumerate(sort!(conn_comp, by=length, rev=true))
-        push!(m, SubNetwork(m, Symbol(string("sn", i)), b))
+    buses = axis(m[Bus])
+    conn_comp = connected_components(graph(m, buses=buses))
+
+    empty!(m.subnetworks)
+    for b = sort!(conn_comp, by=length, rev=true)
+        push!(m.subnetworks, SubNetwork(m, Axis{axisname(buses)}(buses[b])))
     end
 end
 
-function cycle_matrix(sn::SubNetwork; ctype=PassiveBranchComponent)
-    ax = axis(sn, :branches, ctype=ctype)
+function cycle_matrix(sn::SubNetwork; ctype=PassiveBranch)
+    ax = axis(sn[ctype])
+    length(ax) == 0 && return sparse([], [], [])
+
     g = graph(sn, ctype=ctype)
     L = sum(length(get_prop(g, e, :branches)) for e = edges(g))
     cycles = cycle_basis(g)

@@ -6,8 +6,18 @@ abstract type Emission <: ExpressionType end
 struct Cost <: ExpressionType end
 struct CO2 <: Emission end
 
-mutable struct EnergyModel
+abstract type Container end
+abstract type AbstractModel <: Container end
+
+# There are no cyclic dependencies in Julia
+struct SubNetwork{T <: AbstractModel} <: Container
+    model::T
+    buses::Axis
+end
+
+struct EnergyModel <: AbstractModel
     components::Dict{Symbol,Component}
+    subnetworks::Vector{SubNetwork{EnergyModel}}
     data::Data
     jump::Model
     # cache::Dict{Symbol,Any}
@@ -18,42 +28,47 @@ struct Bus <: Component
     class::Symbol
 end
 
-# OnePortComponents
-abstract type OnePortComponent <: Component end
+# OnePort
+abstract type OnePort <: Component end
 for component = (:Generator, :Load, :StorageUnit, :Store)
     @eval begin
-        struct $component <: OnePortComponent
+        struct $component <: OnePort
             model::EnergyModel
             class::Symbol
         end
     end
 end
 
-# BranchComponentsDict{Symbol, Any}
-abstract type BranchComponent <: Component end
+# Branch
+abstract type Branch <: Component end
 
-# ActiveBranchComponents
-abstract type ActiveBranchComponent <: BranchComponent end
-struct Link <: ActiveBranchComponent
+# ActiveBranch
+abstract type ActiveBranch <: Branch end
+struct Link <: ActiveBranch
     model::EnergyModel
     class::Symbol
 end
 
-# PassiveBranchComponent
-abstract type PassiveBranchComponent <: BranchComponent end
+# PassiveBranch
+abstract type PassiveBranch<: Branch end
 for component = (:Line, :Transformer)
     @eval begin
-        struct $component <: PassiveBranchComponent
+        struct $component <: PassiveBranch
             model::EnergyModel
             class::Symbol
         end
     end
 end
 
-# AggregateComponents
-abstract type AggregateComponent <: Component end
-struct SubNetwork <: AggregateComponent
+abstract type AbstractContainerView{T} <: Container end
+
+struct ContainerView{T} <: AbstractContainerView{T}
     model::EnergyModel
-    class::Symbol
-    buses::Vector{Int64}
+    components::Vector{T}
+end
+
+struct SubContainerView{T} <: AbstractContainerView{T}
+    model::EnergyModel
+    components::Vector{T}
+    buses::Axis
 end

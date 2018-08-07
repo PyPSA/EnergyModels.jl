@@ -5,7 +5,7 @@ using JuMP: addtoexpr_reorder, esc_nonconstant, variable_error,
     isdependent, variabletype, getloopedcode, validmodel, coloncheck,
     EMPTYSTRING, JuMPContainer, registervar, storecontainerdata,
     _canonicalize_sense, registercon, parseExprToplevel, pushmeta!,
-    addconstraint, constructconstraint!
+    addconstraint, constructconstraint!, addVectorizedConstraint
 
 using Base.Meta: isexpr, quot
 
@@ -161,7 +161,7 @@ macro emvariable(c, args...)
     value = get(p, :value, NaN)
 
     escvarname = esc(getname(var))
-    quotvarname = :(naming(Symbol, $(esc(c)), $(esc(c)).class, $(quot(getname(var)))))
+    quotvarname = :(Symbol($(esc(c)).class, $(quot(getname(var)))))
 
     initcode = Expr(:block)
     m = extract_and_verify_model!(initcode, c)
@@ -230,7 +230,7 @@ macro emconstraint(c, args...)
 
     v, x = filter(x->!isexpr(x, :(=)), args)
 
-    quotvarname = :(naming(Symbol, $(esc(c)), $(esc(c)).class, $(quot(getname(v)))))
+    quotvarname = :(Symbol($(esc(c)).class, $(quot(getname(v)))))
     escvarname  = esc(getname(v))
 
     if isa(x, Symbol)
@@ -337,5 +337,14 @@ macro emconstraint(c, args...)
         $initcode
         $loopedcode
         registercon($m, $quotvarname, $escvarname)
+    end
+end
+
+macro consense(x, msgs...)
+    msg = isempty(msgs) ? string(x, " has conflicting values") : :(string($(esc(msgs[1])), ": ", unique(v)))
+    quote
+        v = $(esc(x))
+        @assert(all(broadcast(==, v, first(v))), $msg)
+        first(v)
     end
 end
