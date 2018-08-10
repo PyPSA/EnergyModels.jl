@@ -1,10 +1,9 @@
-# __precompile__()
+__precompile__()
 
 module EnergyModels
 
 using Compat
 using Destruct
-using NamedTuples
 using JuMP
 using Gurobi
 using AxisArrays

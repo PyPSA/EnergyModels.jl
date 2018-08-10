@@ -76,6 +76,61 @@ function embuildrefsets!(initcode, c, var, escvarname)
     refcall, idxvars, idxsets, idxpairs, condition, axisreprs
 end
 
+## Straight copy from JuMP master, will be removed as soon as we port
+
+# Any fields can usually be either a number or an expression
+mutable struct VariableInfoExpr
+    haslb::Bool
+    lowerbound::Any
+    hasub::Bool
+    upperbound::Any
+    hasfix::Bool
+    fixedvalue::Any
+    hasstart::Bool
+    start::Any
+    binary::Any
+    integer::Any
+end
+
+function setlowerbound_or_error(_error::Function, info::VariableInfoExpr, lower)
+    info.haslb && _error("Cannot specify variable lowerbound twice")
+    info.haslb = true
+    info.lowerbound = lower
+end
+function setupperbound_or_error(_error::Function, info::VariableInfoExpr, upper)
+    info.hasub && _error("Cannot specify variable lowerbound twice")
+    info.hasub = true
+    info.upperbound = upper
+end
+function fix_or_error(_error::Function, info::VariableInfoExpr, value)
+    info.hasfix && _error("Cannot specify variable fixed value twice")
+    info.hasfix = true
+    info.fixedvalue = value
+end
+function setbinary_or_error(_error::Function, info::VariableInfoExpr)
+    info.binary === false || _error("'Bin' and 'binary' keyword argument cannot both be specified.")
+    info.binary = true
+end
+function setinteger_or_error(_error::Function, info::VariableInfoExpr)
+    info.integer === false || _error("'Int' and 'integer' keyword argument cannot both be specified.")
+    info.integer = true
+end
+
+function isinfokeyword(kw::Expr)
+    kw.args[1] in [:lowerbound, :upperbound, :start, :binary, :integer]
+end
+# :(start = 0)     -> (:start, 0)
+# :(start = i + 1) -> (:start, :($(Expr(:escape, :(i + 1)))))
+
+function keywordify(kw::Expr)
+    (kw.args[1], esc_nonconstant(kw.args[2]))
+end
+
+function VariableInfoExpr(; lowerbound=NaN, upperbound=NaN, start=NaN, binary=false, integer=false, fixedvalue=NaN)
+    # isnan(::Expr) is not defined so we need to do !== NaN
+    VariableInfoExpr(lowerbound !== NaN, lowerbound, upperbound !== NaN, upperbound, fixedvalue !== NaN, fixedvalue, start !== NaN, start, binary, integer)
+end
+
 """
     @emvariable(c, args...)
 
@@ -104,61 +159,40 @@ macro emvariable(c, args...)
     kwargs = filter(x->isexpr(x, :(=)), args)
     args = filter(x->!isexpr(x, :(=)), args)
 
+    info_kwargs = filter(isinfokeyword, kwargs)
+    extra_kwargs = filter(kw -> !isinfokeyword(kw), kwargs)
+    infoexpr = VariableInfoExpr(; keywordify.(info_kwargs)...)
+
     ex = shift!(args)
 
     if isa(ex, Symbol)
         # fast-track for an unbounded singleton var
         @assert !in(ex, var_cats) "Ambiguous variable name $ex detected."
-        p = @NT(var=ex)
+        var = ex
     else
-        p = @match ex begin
-            L_ <= V_ <= U_ => @NT(var=V, lb=L, ub=U)
-            V_ <= U_       => @NT(var=V, ub=U)
-            V_ >= L_       => @NT(var=V, lb=L)
-            V_ == F_       => @NT(var=V, t=:Fixed, value=F, ub=F, lb=F)
-            V_             => @NT(var=V)
+        var = @match ex begin
+            L_ <= V_ <= U_ => (setlowerbound_or_error(_error, infoexpr, L);
+                               setupperbound_or_error(_error, infoexpr, U); V)
+            V_ <= U_       => (setupperbound_or_error(_error, infoexpr, U); V)
+            V_ >= L_       => (setlowerbound_or_error(_error, infoexpr, L); V)
+            V_ == F_       => (fix_or_error(_error, infoexpr, F); V)
+            V_             => V
         end
 
         # We only support named variables
-        @assert isa(p.var, Symbol) || isexpr(p.var, :ref) "$(p.var) is not a valid variable"
+        @assert isa(var, Symbol) || isexpr(var, :ref) "$(var) is not a valid variable"
     end
 
-    for ex in args
+    t = quot(:Default)
+    for ex in extra_kwargs
         if ex in var_cats
-            @assert !haskey(p, :t) "Specified categories $(p.t) and $(ex)"
-            parse = setindex(parse, :t, ex)
+            t = ex
         end
     end
 
-    value = NaN
-    extra_kwargs = []
-    for ex in kwargs
-        kwarg = ex.args[1]
-        if kwarg == :start
-            value = esc(ex.args[2])
-        elseif kwarg == :lowerbound
-            @assert !haskey(p, :lb) "Cannot specify variable lowerbound twice"
-            p = setindex(p, :lb, ex.args[2])
-        elseif kwarg == :upperbound
-            @assert !haskey(p, :ub) "Cannot specify variable lowerbound twice"
-            p = setindex(p, :ub, ex.args[2])
-        elseif kwarg == :category
-            @assert !haskey(p, :t) "Cannot specify variable category twice"
-            p = setindex(p, :t, ex.args[2])
-        elseif in(kwarg, (:objective, :inconstraints, :coefficients))
-            error("No support for column generation in @emvariable, yet.")
-        elseif kwarg == :basename
-            error("The anonymous syntax is not supported in @emvariable.")
-        else
-            push!(extra_kwargs, ex)
-        end
-    end
-
-    var = p.var
-    ub = get(p, :ub, Inf)
-    lb = get(p, :lb, -Inf)
-    t = quot(get(p, :t, :Default))
-    value = get(p, :value, NaN)
+    ub = infoexpr.upperbound
+    lb = infoexpr.lowerbound
+    value = infoexpr.fixedvalue
 
     escvarname = esc(getname(var))
     quotvarname = :(naming($(esc(c)), $(quot(getname(var)))))
