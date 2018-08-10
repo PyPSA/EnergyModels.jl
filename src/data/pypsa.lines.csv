@@ -3,10 +3,12 @@ bus0,bus0,,static,,string
 bus1,bus1,,static,,string
 type,type,,single,,string
 carrier,carrier,,single,AC,string
-num_parallel,num_parallel,,static,1,int
+num_parallel,num_parallel,,static,1,float
 length,length,,static,0,float
 s_nom,s_nom,s_nom_extendable,static,0,float
 s_nom_min,s_nom_min,,static,0,float
 s_nom_max,s_nom_max,,static,Inf,float
 s_max_pu,s_max_pu,,series,1,float
+x,x,,static,0,float
+r,r,,static,0,float
 capital_cost,capital_cost,,static,0,float

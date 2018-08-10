@@ -19,17 +19,17 @@ struct MissingPypsaAttrInfo{T} <: AbstractPypsaAttrInfo
 end
 
 struct PypsaClassInfo
-    ctype::DataType
+    elemtype::ElementType
     class::Symbol
     names::Axis
     attrinfos::Dict{Symbol,AbstractPypsaAttrInfo}
     variables::Set{Symbol}
-    typeparams::Dict{Symbol,Any}
+    typeparams::Union{Nothing,Dict{Symbol,Any}}
 end
 
 struct PypsaNcData <: AbstractNcData
     dataset::Dataset
-    components::Vector{DataType}
+    elements::Vector{ElementType}
     classinfos::Dict{Symbol}{PypsaClassInfo}
 end
 
@@ -38,18 +38,21 @@ function maybe_as_range(x::Vector{T}) where T<:Number
     d = diff(x)
     s = d[1]
     if all(d .== s)
-        s == 1 ? x[1]:x[end] : x[1]:s:x[end]
+        s == 1 ? (x[1]:x[end]) : (x[1]:s:x[end])
     else
         x
     end
 end
 
-function splitbyattr(ds, listname, attr)
-    if !haskey(ds, attr)
+function splitbyattr(ds, listname, attrs)
+    i = 1
+    while i <= length(attrs) && !haskey(ds, attrs[i])
+        i+=1
+    end
+    if i > length(attrs)
         return Dict(Symbol(listname)=>Colon())
     end
-
-    da = ds[attr]
+    da = ds[attrs[i]]
     df = DataFrame(indices=1:length(da), class=da[:])
     Dict(Symbol(g[1, :class]) => maybe_as_range(g[:indices])
          for g = groupby(df, :class))
@@ -101,13 +104,14 @@ function pypsavariables(attrs, name, ds, listname, indices)
 end
 
 function pypsatypeparams(name, ds, listname, indices, types)
-    if types === nothing return Dict() end
-    typename = @consense(ds[string(listname, "_type")][:][indices], "$name may not have more than one type")
+    typefield = string(listname, "_type")
+    if types === nothing || !haskey(ds, typefield) return nothing end
+    typename = @consense(ds[typefield][:][indices], "$name may not have more than one type")
     typ = types[types[:name] .== typename, :]
     Dict(c => typ[1, c] for c = names(typ) if c != :name)
 end
 
-function pypsaclassinfos(ds, listname, ctype)
+function pypsaclassinfos(ds, listname, elemtype)
     classinfos = Dict{Symbol, PypsaClassInfo}()
 
     attrs = CSV.read(joinpath(@__DIR__, string("pypsa.", listname, ".csv"));
@@ -117,13 +121,13 @@ function pypsaclassinfos(ds, listname, ctype)
     typesfn = joinpath(@__DIR__, string("pypsa.", listname, ".types.csv"))
     types = isfile(typesfn) ? CSV.read(typesfn) : nothing
 
-    for (class, indices) = splitbyattr(ds, listname, listname * "_carrier")
+    for (class, indices) = splitbyattr(ds, listname, (listname * "_class", listname * "_carrier"))
         names = disallowmissing(ds[listname * "_i"][:][indices])
         name = string(listname, "::", class)
         attrinfos = pypsaattrinfos(attrs, name, ds, listname, indices, names)
         variables = pypsavariables(attrs, name, ds, listname, indices)
         typeparams = pypsatypeparams(name, ds, listname, indices, types)
-        classinfos[class] = PypsaClassInfo(ctype, class, Axis{Symbol(naming(ctype))}(names), attrinfos, variables, typeparams)
+        classinfos[class] = PypsaClassInfo(elemtype, class, Axis{Symbol(naming(elemtype))}(names), attrinfos, variables, typeparams)
     end
 
     classinfos
@@ -148,21 +152,21 @@ function PypsaNcData(ds)
 
     # Determine defined components and split them into classes
     # Work In Progress: for now we assume that splitting on carrier is good enough
-    components = DataType[]
+    elements = ElementType[]
     classinfos = Dict{Symbol}{PypsaClassInfo}()
     for row = eachrow(pypsacomponents)
         listname = row[:listname]
 
         # Resolve julia types in the EnergyModels module (i'm not sure if that's
         # the most sensible way to do it)
-        ctype = resolve(Symbol(row[:componenttype]))
+        elemtype = resolve(Symbol(row[:componenttype]))
 
         if !haskey(ds.dim, listname * "_i") || ds.dim[listname * "_i"] == 0
             continue
         end
 
-        push!(components, ctype)
-        merge!(classinfos, pypsaclassinfos(ds, listname, ctype))
+        push!(elements, elemtype)
+        merge!(classinfos, pypsaclassinfos(ds, listname, elemtype))
     end
 
     # ## Below there is a try to figure out the splits based on grouping all
@@ -202,7 +206,7 @@ function PypsaNcData(ds)
     #         index = df[:inds])
     # end
 
-    PypsaNcData(ds, components, classinfos)
+    PypsaNcData(ds, elements, classinfos)
 end
 
 
@@ -222,18 +226,18 @@ function Base.get(data::PypsaNcData, attrinfo::PypsaAttrInfo{T}, ax) where T
               ax, (axis(data, n) for n = dims)...)
 end
 
-function Base.get(data::PypsaNcData, component::Component, class::Symbol, param::Symbol)
-    classinfo = data.classinfos[class]
+function Base.get(data::PypsaNcData, element::ModelElement, param::Symbol)
+    classinfo = data.classinfos[naming(element)]
     get(data, classinfo.attrinfos[param], classinfo.names)
 end
 
 gettypeparams(data::PypsaNcData, component::Component, class::Symbol) =
-    data.classinfos[class].typeparams
+    data.classinfos[naming(component)].typeparams
 
-isvar(data::PypsaNcData, component::Component, class::Symbol, param::Symbol) =
-    in(param, data.classinfos[class].variables)
+isvar(data::PypsaNcData, element::ModelElement, param::Symbol) =
+    in(param, data.classinfos[naming(element)].variables)
 
-axis(data::PypsaNcData, c::Component, class) = data.classinfos[class].names
+axis(data::PypsaNcData, e::ModelElement) = data.classinfos[naming(e)].names
 
-components(data::PypsaNcData) = data.components
-classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.ctype === T)
+modelelements(data::PypsaNcData) = data.elements
+classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.elemtype === T)

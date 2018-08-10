@@ -10,4 +10,6 @@ s_nom,s_nom,s_nom_extendable,static,0,float
 s_nom_min,s_nom_min,,static,0,float
 s_nom_max,s_nom_max,,static,Inf,float
 s_max_pu,s_max_pu,,series,1,float
+x,x,,static,0,float
+r,r,,static,0,float
 capital_cost,capital_cost,,static,0,float

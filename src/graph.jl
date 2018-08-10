@@ -22,12 +22,12 @@ function graph(m::EnergyModel; ctype=PassiveBranch, buses=axis(m[Bus]))
 end
 
 function determine_subnetworks!(m::EnergyModel)
-    buses = axis(m[Bus])
+    buses = axis(m, Bus)
     conn_comp = connected_components(graph(m, buses=buses))
 
     empty!(m.subnetworks)
-    for b = sort!(conn_comp, by=length, rev=true)
-        push!(m.subnetworks, SubNetwork(m, Axis{axisname(buses)}(buses[b])))
+    for (i,b) = enumerate(sort!(conn_comp, by=length, rev=true))
+        push!(m.subnetworks, SubNetwork(m, Symbol(:sn, i), Axis{axisname(buses)}(buses[b])))
     end
 end
 

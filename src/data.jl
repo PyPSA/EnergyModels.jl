@@ -49,15 +49,6 @@ function load(filename::String)::Data
     end
 end
 
-resolve(ctype::Symbol) = getfield(EnergyModels, ctype)
-
-naming(::Type{Symbol}, c::Component, symbols...) = Symbol(naming(c, symbols...))
-naming(::T, symbols...) where T<:Component = join((naming(T), string.(symbols)...), "::")
-function naming(::Type{T}) where T<:Component
-    s = lowercase(string(T))
-    s[findlast(s, '.')+1:end] * (s[end] == 's' ? "es" : "s")
-end
-
 function Base.get(data::NcData, args...)
     da = data.dataset[naming(args...)]
     AxisArray(da[:], (axis(data, n) for n = dimnames(da))...)

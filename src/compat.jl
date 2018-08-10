@@ -20,6 +20,7 @@ function axisdim(::Type{JuMPArray{T,N,Ax}}, ::Type{<:Axis{name}}) where {T,N,Ax,
     idx == 0 && error("axis $name not found in array axes $names")
     idx
 end
+
 axisdim(A::JuMPArray, ax::Axis) = axisdim(A, typeof(ax))
 @generated function axisdim(A::JuMPArray, ax::Type{Ax}) where Ax<:Axis
     dim = axisdim(A, Ax)

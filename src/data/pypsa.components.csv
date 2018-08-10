@@ -1,9 +1,9 @@
 componenttype,listname
-Bus,buses
-Generator,generators
-StorageUnit,storage_units
-Store,stores
-Load,loads
-Link,links
-Line,lines
-Transformer,transformers
+buses,buses
+generators,generators
+storageunits,storage_units
+stores,stores
+loads,loads
+links,links
+lines,lines
+transformers,transformers

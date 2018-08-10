@@ -161,7 +161,7 @@ macro emvariable(c, args...)
     value = get(p, :value, NaN)
 
     escvarname = esc(getname(var))
-    quotvarname = :(Symbol($(esc(c)).class, $(quot(getname(var)))))
+    quotvarname = :(naming($(esc(c)), $(quot(getname(var)))))
 
     initcode = Expr(:block)
     m = extract_and_verify_model!(initcode, c)
@@ -230,7 +230,7 @@ macro emconstraint(c, args...)
 
     v, x = filter(x->!isexpr(x, :(=)), args)
 
-    quotvarname = :(Symbol($(esc(c)).class, $(quot(getname(v)))))
+    quotvarname = :(naming($(esc(c)), $(quot(getname(v)))))
     escvarname  = esc(getname(v))
 
     if isa(x, Symbol)
@@ -243,17 +243,8 @@ macro emconstraint(c, args...)
     initcode = quote end
     m = extract_and_verify_model!(initcode, c)
 
-    # Strategy: build up the code for non-macro addconstraint, and if needed
-    # we will wrap in loops to assign to the ConstraintRefs
     refcall, idxvars, idxsets, idxpairs, condition, axisreprs = embuildrefsets!(initcode, c, v, escvarname)
 
-    # JuMP accepts constraint syntax of the form @constraint(m, foo in bar).
-    # This will be rewritten to a call to constructconstraint!(foo, bar). To
-    # extend JuMP to accept set-based constraints of this form, it is necessary
-    # to add the corresponding methods to constructconstraint!. Note that this
-    # will likely mean that bar will be some custom type, rather than e.g. a
-    # Symbol, since we will likely want to dispatch on the type of the set
-    # appearing in the constraint.
     if isexpr(x, :call)
         if x.args[1] == :in
             constraint_error("Iteration over in is not supported with emconstraint, for now.")
