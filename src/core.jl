@@ -45,7 +45,7 @@ EnergyModel(data::Data; solver=GurobiSolver()) = load(EnergyModel(Dict{Symbol,Co
 
 function load(m::EnergyModel)
     for T = modelelements(m.data), class = classes(m.data, T) push!(m, T(m, class)) end
-    # determine_subnetworks!(m)
+    determine_subnetworks!(m)
     m
 end
 
