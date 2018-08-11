@@ -1,11 +1,12 @@
 julia 0.6
 Compat
 Destruct
-NamedTuples
+DataFrames
 MacroTools
 AxisArrays
 LightGraphs
 MetaGraphs
+NCDatasets
 JuMP
 Gurobi
-Clp
+CSV
