@@ -134,7 +134,7 @@ function impedance(c::Transformer)
 end
 
 
-cost(c::PassiveBranch) = sum(c[:capital_cost] .* c[:s_nom])
+cost(c::PassiveBranch) = sum(c[:capital_cost] .* (c[:s_nom] .- getparam(c, :s_nom)))
 
 function nodalbalance(c::Branch)
     p = c[:p]

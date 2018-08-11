@@ -13,7 +13,7 @@ end
 busattributes(c::OnePort) = (:bus,)
 
 ## Defaults for OnePort
-cost(c::OnePort) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:p_nom])
+cost(c::OnePort) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
 nodalbalance(c::OnePort) = (p = c[:p]; (c[:bus] => (o,t)->p[o,t],))
 
 ## Generator
@@ -31,7 +31,7 @@ end
 addelement(Generator, :generators, (:G, :T=>:snapshots), joinpath(@__DIR__, "generators.csv"))
 
 ## StorageUnit
-cost(c::StorageUnit) = sum(c[:marginal_cost] .* c[:p_dispatch]) + sum(c[:capital_cost] .* c[:p_nom])
+cost(c::StorageUnit) = sum(c[:marginal_cost] .* c[:p_dispatch]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
 function nodalbalance(c::StorageUnit)
     p_dispatch = c[:p_dispatch]
     p_store = c[:p_store]
@@ -79,7 +79,7 @@ addelement(StorageUnit, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, 
 
 
 ## Store
-cost(c::Store) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:e_nom])
+cost(c::Store) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:e_nom] - getparam(c, :e_nom)))
 function build(c::Store)
     T = axis(c, :snapshots)
     S = axis(c)
