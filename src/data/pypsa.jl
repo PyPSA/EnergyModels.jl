@@ -19,7 +19,7 @@ struct MissingPypsaAttrInfo{T} <: AbstractPypsaAttrInfo
 end
 
 struct PypsaClassInfo
-    elemtype::ElementType
+    elemtype::Symbol
     class::Symbol
     names::Axis
     attrinfos::Dict{Symbol,AbstractPypsaAttrInfo}
@@ -29,7 +29,7 @@ end
 
 struct PypsaNcData <: AbstractNcData
     dataset::Dataset
-    elements::Vector{ElementType}
+    elements::Vector{Symbol}
     classinfos::Dict{Symbol}{PypsaClassInfo}
 end
 
@@ -59,12 +59,13 @@ function splitbyattr(ds, listname, attrs)
 end
 
 PypsaAttrInfo(::Type{Val{:single}}, attr, name, ds, attrname, _, indices, names) =
-    SinglePypsaAttrInfo(convert(Union{typenames[attr[:type]],Missing}, haskey(ds, attrname) ?
-        @consense(ds[attrname][:][indices], "$name must be a single value") : _default(attr)))
+    SinglePypsaAttrInfo(convert(Union{typenames[attr[:dtype]],Missing}, haskey(ds, attrname) ?
+        @consense(ds[attrname][:][indices], "$name must be a single value") : attr[:default]))
 
 PypsaAttrInfo(::Type{Val{:static}}, attr, name, ds, attrname, _, indices, names) =
     haskey(ds, attrname) ?
-    PypsaAttrInfo{typenames[attr[:type]]}(attrname, indices, _default(attr)) : MissingPypsaAttrInfo(_default(attr))
+    PypsaAttrInfo{typenames[attr[:dtype]]}(attrname, indices, attr[:default]) :
+    MissingPypsaAttrInfo(attr[:default])
 
 function PypsaAttrInfo(::Type{Val{:series}}, attr, name, ds, attrname, attrname_t, indices, names)
     attrname_t_i = attrname_t * "_i"
@@ -74,30 +75,27 @@ function PypsaAttrInfo(::Type{Val{:series}}, attr, name, ds, attrname, attrname_
     else
         @assert(length(indices_t) == length(names),
                 "$name has static and time-dependent $(attr[:PyPSA])")
-        PypsaAttrInfo(attrname_t, indices_t, _default(attr))
+        PypsaAttrInfo(attrname_t, indices_t, attr[:default])
     end
 end
 
-_default(attr) = typeparsers[attr[:type]](attr[:default])
-
 PypsaAttrInfo(attr, name, ds, listname, indices, names) =
-    PypsaAttrInfo(Val{Symbol(attr[:dimensions])}, attr, name, ds,
-                  string(listname, "_", attr[:PyPSA]), string(listname, "_t_", attr[:PyPSA]),
+    PypsaAttrInfo(Val{attr[:dimensions]}, attr, name, ds,
+                  string(listname, "_", attr[:PyPSA]),
+                  string(listname, "_t_", attr[:PyPSA]),
                   indices, names)
 
-pypsaattrinfos(attrs, args...) = Dict(attr[:EM]=>PypsaAttrInfo(attr, args...)
+pypsaattrinfos(attrs, args...) = Dict(attr[:attribute]=>PypsaAttrInfo(attr, args...)
                                       for attr = eachrow(attrs))
 
 function pypsavariables(attrs, name, ds, listname, indices)
     variables = Set{Symbol}()
-    if haskey(attrs, :variable_switch)
-        for attr = eachrow(attrs[.!ismissing.(attrs[:variable_switch]), :])
-            switchname = string(listname, "_", attr[:variable_switch])
-            if haskey(ds, switchname) &&
-               @consense(ds[switchname][:][indices],
-                         "$(attr[:variable_switch]) of $name must either be true or false") == 1
-                push!(variables, attr[:EM])
-            end
+    for attr = eachrow(attrs[attrs[:quantitytype] .== "VarParam", :])
+        switchname = string(listname, "_", attr[:PyPSA], "_extendable")
+        if haskey(ds, switchname) &&
+            @consense(ds[switchname][:][indices],
+                      "$(attr[:variable_switch]) of $name must either be true or false") == 1
+            push!(variables, attr[:attribute])
         end
     end
     variables
@@ -111,23 +109,27 @@ function pypsatypeparams(name, ds, listname, indices, types)
     Dict(c => typ[1, c] for c = names(typ) if c != :name)
 end
 
-function pypsaclassinfos(ds, listname, elemtype)
+function pypsaclassinfos(ds, listname, elemtypename)
     classinfos = Dict{Symbol, PypsaClassInfo}()
 
-    attrs = CSV.read(joinpath(@__DIR__, string("pypsa.", listname, ".csv"));
-                     truestring="t", falsestring="f")
-    attrs[:EM] = Symbol.(attrs[:EM])
+    attrs = copy(attributes(elemtypename))
+    attrs = attrs[attrs[:quantitytype] .!= "Variable", :]
+    attrs[:PyPSA] = string.(attrs[:attribute])
+    attrs[:dimensions] = recode(length.(attrs[:dimensions]),
+                                0=>:single, 1=>:static, 2=>:series,
+                                3:20=>missing)
 
+    # TODO types should be refactored into parametertables to be able to represent carriers as well
     typesfn = joinpath(@__DIR__, string("pypsa.", listname, ".types.csv"))
     types = isfile(typesfn) ? CSV.read(typesfn) : nothing
 
-    for (class, indices) = splitbyattr(ds, listname, (listname * "_class", listname * "_carrier"))
+    for (class, indices) = splitbyattr(ds, listname, string.(listname, "_", ("class", "carrier")))
         names = disallowmissing(ds[listname * "_i"][:][indices])
         name = string(listname, "::", class)
         attrinfos = pypsaattrinfos(attrs, name, ds, listname, indices, names)
         variables = pypsavariables(attrs, name, ds, listname, indices)
         typeparams = pypsatypeparams(name, ds, listname, indices, types)
-        classinfos[class] = PypsaClassInfo(elemtype, class, Axis{Symbol(naming(elemtype))}(names), attrinfos, variables, typeparams)
+        classinfos[class] = PypsaClassInfo(elemtypename, class, Axis{elemtypename}(names), attrinfos, variables, typeparams)
     end
 
     classinfos
@@ -152,21 +154,17 @@ function PypsaNcData(ds)
 
     # Determine defined components and split them into classes
     # Work In Progress: for now we assume that splitting on carrier is good enough
-    elements = ElementType[]
+    elements = Symbol[]
     classinfos = Dict{Symbol}{PypsaClassInfo}()
     for row = eachrow(pypsacomponents)
         listname = row[:listname]
-
-        # Resolve julia types in the EnergyModels module (i'm not sure if that's
-        # the most sensible way to do it)
-        elemtype = resolve(Symbol(row[:componenttype]))
-
         if !haskey(ds.dim, listname * "_i") || ds.dim[listname * "_i"] == 0
             continue
         end
 
-        push!(elements, elemtype)
-        merge!(classinfos, pypsaclassinfos(ds, listname, elemtype))
+        elemtypename = Symbol(row[:componenttype])
+        push!(elements, elemtypename)
+        merge!(classinfos, pypsaclassinfos(ds, listname, elemtypename))
     end
 
     # ## Below there is a try to figure out the splits based on grouping all
@@ -239,5 +237,5 @@ isvar(data::PypsaNcData, element::ModelElement, param::Symbol) =
 
 axis(data::PypsaNcData, e::ModelElement) = data.classinfos[naming(e)].names
 
-modelelements(data::PypsaNcData) = data.elements
-classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.elemtype === T)
+modelelements(data::PypsaNcData) = resolve.(data.elements)
+classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.elemtype === naming(T))

@@ -1,5 +1,0 @@
-EM,PyPSA,variable_switch,dimensions,default,type
-x,x,,static,,float
-y,y,,static,,float
-carrier,carrier,,single,,string
-v_nom,v_nom,,static,,float
