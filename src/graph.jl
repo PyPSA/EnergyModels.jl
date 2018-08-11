@@ -3,8 +3,8 @@ struct EdgeInfo{T}
     src::Int64
 end
 
-graph(sn::SubNetwork; ctype=PassiveBranch) = graph(sn.model, ctype=ctype, buses=axis(sn[Bus]))
-function graph(m::EnergyModel; ctype=PassiveBranch, buses=axis(m[Bus]))
+graph(sn::SubNetwork; ctype=PassiveBranch) = graph(sn.model, ctype=ctype, buses=axis(sn, Bus))
+function graph(m::EnergyModel; ctype=PassiveBranch, buses=axis(m, Bus))
     g = MetaGraph(length(buses))
     b = m[ctype]
 
@@ -32,7 +32,7 @@ function determine_subnetworks!(m::EnergyModel)
 end
 
 function cycle_matrix(sn::SubNetwork; ctype=PassiveBranch)
-    ax = axis(sn[ctype])
+    ax = axis(sn, ctype)
     length(ax) == 0 && return sparse([], [], [])
 
     g = graph(sn, ctype=ctype)

@@ -108,8 +108,10 @@ function Base.getindex(m::EnergyModel, class::Symbol)
     throw(KeyError(class))
 end
 Base.getindex(m::EnergyModel, T::Type{<:Component}) = ContainerView(m, Dict(c.class=>c for c=components(m, T)))
-Base.getindex(sn::SubNetwork, T::Type{<:Component}) = SubContainerView(sn.model, Dict(c.class=>c for c=components(sn, T)), sn.buses)
 Base.getindex(m::EnergyModel, ::Type{Bus}) = ContainerView(m, Dict(c.name=>c for c=buses(m)))
+
+Base.getindex(sn::SubNetwork, T::Type{<:Component}) = SubContainerView(model(sn), Dict(c.class=>c for c=components(sn, T)), sn.buses)
+Base.getindex(sn::SubNetwork, ::Type{Bus}) = SubContainerView(model(sn), Dict(c.name=>c for c=buses(model(sn))), sn.buses)
 
 Base.view(e::ModelElement, attr::Symbol, axes) = WrappedArray(e[attr], axes...)
 
