@@ -16,7 +16,7 @@ tupleaxisvals(c) = tupleaxisvals(c, axis(c))
 tupleaxisvals(c, A) = AxisArrays.CategoricalVector(tuple.(c.class, A.val))
 
 _maybesubset(cv::ContainerView, c, A) = A
-_maybesubset(cv::SubContainerView, e::ModelElement, A) = A[indicesinbuses(e, cv.buses), ntuple(i->:,ndims(A)-1)...]
+_maybesubset(cv::SubContainerView, e::ModelElement, A) = A[findin(e, cv.buses), ntuple(i->:,ndims(A)-1)...]
 
 _viewaxis(cv::AbstractContainerView{T}, a) where T = Axis{Symbol(naming(T))}(a)
 axis(cv::AbstractContainerView) = _viewaxis(cv, vcat((_maybesubset(cv, c, tupleaxisvals(c)) for c = components(cv))...))

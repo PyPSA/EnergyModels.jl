@@ -46,6 +46,7 @@ end
 
 
 Base.indexin(a::AbstractArray, b::Axis) = indexin(a, b.val)
+Base.findin(a::AbstractArray, b::Axis) = findin(a, b.val)
 
 # iteration on Axis
 @inline Base.start(A::Axis) = 1
