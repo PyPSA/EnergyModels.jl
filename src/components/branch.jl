@@ -89,15 +89,31 @@ end
 
 phaseshift(c::Transformer) = gettypeparams(c.model.data, c, class)[:phase_shift]
 function impedance(c::Transformer)
+    ax = axis(c)
     p = gettypeparams(c.model.data, c, c.class)
 
-    num_parallel = c[:num_parallel]
+    if p !== nothing
+        num_parallel = c[:num_parallel]
+        s_nom = p[:s_nom]
 
-    r_pu = p[:vscr]/100 / p[:s_nom] ./ num_parallel
-    x_pu = sqrt(p[:vsc]^2 - p[:vscr]^2)/100 / p[:s_nom] ./ num_parallel
-    g_pu = p[:pfe]/1000 .* num_parallel
-    b_pu = (-sqrt(clamp((p[:i0] * p[:s_nom])^2 - (p[:pfe]/10)^2, 0., Inf)) / 100
-            .* num_parallel)
+        r = p[:vscr]/100 ./ num_parallel
+        x = sqrt(p[:vsc]^2 - p[:vscr]^2)/100 ./ num_parallel
+        g = p[:pfe]/(1000*p[:s_nom]) .* num_parallel
+        b = (-sqrt(clamp((p[:i0])^2 - (p[:pfe]/(10*p[:s_nom]))^2, 0., Inf)) / 100
+             .* num_parallel)
+    else
+        s_nom = c[:s_nom]
+
+        x = c[:x]
+        r = c[:r]
+        g = c[:g]
+        b = c[:b]
+    end
+
+    r_pu = AxisArray(r ./ s_nom, ax)
+    x_pu = AxisArray(x ./ s_nom, ax)
+    g_pu = AxisArray(g .* s_nom, ax)
+    b_pu = AxisArray(b .* s_nom, ax)
 
     """Follows http://home.earthlink.net/~w6rmk/math/wyedelta.htm"""
     function wye_to_delta(z1,z2,z3)
@@ -122,11 +138,13 @@ function impedance(c::Transformer)
         end
     end
 
-    c[:model] == "t" && apply_transformer_t_model!(r_pu, x_pu, g_pu, b_pu)
+    if c[:model] == "t"
+        apply_transformer_t_model!(r_pu, x_pu, g_pu, b_pu)
+    end
 
-    tap_ratio = 1 .+ (c[:tap_position] .- p[:tap_neutral]) .* (p[:tap_step]/100.)
-    Dict(:r_pu => r_pu, :r_pu_eff => r_pu .* tap_ratio,
-         :x_pu => x_pu, :x_pu_eff => x_pu .* tap_ratio,
+    tap_ratio = AxisArray(1 .+ (c[:tap_position] .- p[:tap_neutral]) .* (p[:tap_step]/100.), ax)
+    Dict(:r_pu => r_pu, :r_pu_eff => AxisArray(r_pu .* tap_ratio, ax),
+         :x_pu => x_pu, :x_pu_eff => AxisArray(x_pu .* tap_ratio, ax),
          :g_pu => g_pu, :b_pu => b_pu,
          :tap_ratio => tap_ratio,
          :phase_shift => p[:phase_shift],
