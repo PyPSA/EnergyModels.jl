@@ -103,7 +103,7 @@ getparam(e::ModelElement, attr::Symbol) = get(model(e).data, e, attr)
 
 Base.getindex(m::EnergyModel, class::Symbol) = m.components[class]
 Base.getindex(m::EnergyModel, T::Type{<:Component}) = ContainerView(m, Dict(c.class=>c for c=components(m, T)))
-Base.getindex(sn::SubNetwork, T::Type{<:Component}) = SubContainerView(sn.model, Dict(c.class=>c for c=components(m, T)), sn.buses)
+Base.getindex(sn::SubNetwork, T::Type{<:Component}) = SubContainerView(sn.model, Dict(c.class=>c for c=components(sn, T)), sn.buses)
 Base.getindex(m::EnergyModel, ::Type{Bus}) = ContainerView(m, Dict(c.name=>c for c=buses(m)))
 
 Base.view(e::ModelElement, attr::Symbol, axes) = WrappedArray(e[attr], axes...)
@@ -111,6 +111,8 @@ Base.view(e::ModelElement, attr::Symbol, axes) = WrappedArray(e[attr], axes...)
 axis(m::EnergyModel, args...) = axis(m.data, args...)
 axis(e::ModelElement) = axis(model(e), e)
 axis(e::ModelElement, attr) = axis(model(e), attr)
+axis(m::Container, T::Type{<:ModelElement}) = axis(m[T])
+axis(m::EnergyModel, T::Type{<:ModelElement}) = axis(m[T])
 
 # Could be specialized to not have to retrieve the whole axis (on the other
 # hand, the axis should be cached, anyway)

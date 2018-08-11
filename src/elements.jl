@@ -18,7 +18,7 @@ function build(m::EnergyModel)
         build(m, c)
     end
     info("* Equations for subnetworks")
-    for sn = values(m.subnetworks)
+    for sn = subnetworks(m)
         build(m, sn)
     end
     info("* Cost minimization objective")

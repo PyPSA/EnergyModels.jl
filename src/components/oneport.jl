@@ -95,7 +95,7 @@ function build(c::Store)
     if !c[:e_cyclic] e_prev[:,T[1]] .= c[:e_initial] end
 
     @emconstraint(c, e_eq[s=S, t=T],
-                  c[:e][s,t] - (1. - c[:standing_loss][s]) * e_prev[s,t] == c[:p])
+                  c[:e][s,t] - (1 - c[:standing_loss][s]) * e_prev[s,t] == c[:p])
 end
 
 addelement(Store)

@@ -69,11 +69,11 @@ function impedance(c::Line)
         x = AxisArray(p[:x_per_length] .* length ./ num_parallel, ax)
         r = AxisArray(p[:r_per_length] .* length ./ num_parallel, ax)
         # b = AxisArray(2pi*1e-9*p[:f_nom]*p[:c_per_length] .* length .* num_parallel, ax)
-    end
-
-    x = c[:x]
-    r = c[:r]
+    else
+      x = c[:x]
+      r = c[:r]
     # b = c[:b]
+    end
 
     x_pu = AxisArray(x ./ v_nom.^2, ax)
     r_pu = AxisArray(r ./ v_nom.^2, ax)
