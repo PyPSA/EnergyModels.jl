@@ -11,8 +11,7 @@ struct Link <: ActiveBranch
     class::Symbol
 end
 
-indicesinbuses(c::Branch, buses) = indicesinbuses(c, buses, (:bus0, :bus1))
-
+busattributes(c::Branch) = (:bus0, :bus1)
 
 # Possible ways to have an emaggregator macro
 # @emaggregator(nodalbalance, c::Link, l, c[:bus0] => c[:p][l], c[:bus1] => -c[:p][l])

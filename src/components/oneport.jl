@@ -10,7 +10,7 @@ for component = (:Generator, :Load, :StorageUnit, :Store)
     end
 end
 
-indicesinbuses(c::OnePort, buses) = indicesinbuses(c, buses, (:bus,))
+busattributes(c::OnePort) = (:bus,)
 
 ## Defaults for OnePort
 cost(c::OnePort) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:p_nom])

@@ -83,7 +83,7 @@ naming(c::Component) = c.class
 naming(e::ModelElement) = e.name
 naming(e::ModelElement, args...) = Symbol(naming(e), flatten(("::", a) for a=args)...)
 
-indicesinbuses(c::Component, buses, busattrs) = intersect((findin(c[attr], buses.val) for attr = busattrs)...)
+indicesinbuses(c::Component, buses) = intersect((findin(c[attr], buses.val) for attr = busattributes(c))...)
 indicesinbuses(c::Bus, buses) = findin(axis(c), buses.val)
 
 isvar(m::EnergyModel, e::ModelElement, attr::Symbol) = isvar(m.data, e, attr)
