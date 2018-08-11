@@ -101,7 +101,12 @@ getvalue(e::ModelElement, attr::Symbol) = getvalue(getjump(e, attr))
 getdual(e::ModelElement, attr::Symbol) = getdual(getjump(e, attr))
 getparam(e::ModelElement, attr::Symbol) = get(model(e).data, e, attr)
 
-Base.getindex(m::EnergyModel, class::Symbol) = m.components[class]
+function Base.getindex(m::EnergyModel, class::Symbol)
+    for t = (:components, :buses, :subnetworks)
+        haskey(getfield(m, t), class) && return getfield(m, t)[class]
+    end
+    throw(KeyError(class))
+end
 Base.getindex(m::EnergyModel, T::Type{<:Component}) = ContainerView(m, Dict(c.class=>c for c=components(m, T)))
 Base.getindex(sn::SubNetwork, T::Type{<:Component}) = SubContainerView(sn.model, Dict(c.class=>c for c=components(sn, T)), sn.buses)
 Base.getindex(m::EnergyModel, ::Type{Bus}) = ContainerView(m, Dict(c.name=>c for c=buses(m)))
