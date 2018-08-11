@@ -91,9 +91,14 @@ function build(c::Store)
     @emvariable c c[:e_min_pu][s,t] * c[:e_nom][s] <= e[s=S,t=T] <= c[:e_max_pu][s,t] * c[:e_nom][s]
     @emvariable c p[s=S,t=T]
 
-    e_prev = circshift(c[:e], :snapshots=>1)
-    if !c[:e_cyclic] e_prev[:,T[1]] .= c[:e_initial] end
-
+    e = c[:e]
+    if c[:e_cyclic]
+        e_prev = circshift(e, :snapshots=>1)
+    else
+        e_prev = similar(e, Union{Float64,eltype(e)})
+        e_prev[:,1] .= c[:e_initial]
+        e_prev[:,2:end] .= e[:,1:end-1]
+    end
     @emconstraint(c, e_eq[s=S, t=T],
                   c[:e][s,t] - (1 - c[:standing_loss][s]) * e_prev[s,t] == c[:p])
 end
