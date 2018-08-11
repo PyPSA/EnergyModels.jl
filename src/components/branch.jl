@@ -25,7 +25,7 @@ function nodalbalance(c::Link)
      c[:bus1] => (l,t)->eff[l]*p[l,t])
 end
 
-cost(c::Link) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* c[:p_nom])
+cost(c::Link) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
 function build(c::Link)
     L = axis(c)
 
@@ -36,7 +36,7 @@ function build(c::Link)
     @emvariable c c[:p_min_pu][l,t] * c[:p_nom][l] <= p[l=L,t=:snapshots] <= c[:p_max_pu][l,t] * c[:p_nom][l]
 end
 
-addelement(Link)
+addelement(Link, :links, (:L, :T=>:snapshots), joinpath(@__DIR__, "links.csv"))
 
 
 # PassiveBranch
@@ -151,5 +151,5 @@ function build(c::PassiveBranch)
     @emvariable c -c[:s_max_pu][l,t] * c[:s_nom][l] <= p[l=L,t=:snapshots] <= c[:s_max_pu][l,t] * c[:s_nom][l]
 end
 
-addelement(Line)
-addelement(Transformer)
+addelement(Line, :lines, (:L, :T=>:snapshots), joinpath(@__DIR__, "lines.csv"))
+addelement(Transformer, :transformers, (:L, :T=>:snapshots), joinpath(@__DIR__, "transformers.csv"))

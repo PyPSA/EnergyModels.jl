@@ -9,6 +9,7 @@ using Gurobi
 using AxisArrays
 using LightGraphs
 using MetaGraphs
+using DataFrames
 
 include("compat.jl")
 include("wrappedarray.jl")

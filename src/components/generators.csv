@@ -1,0 +1,12 @@
+attribute,quantitytype,dimensions,default,dtype
+p_nom,VarParam,G,0,float
+p_max_pu,Param,"G,T",1,float
+p_min_pu,Param,"G,T",0,float
+p_nom_min,Param,G,0,float
+p_nom_max,Param,G,Inf,float
+efficiency,Param,G,1,float
+carrier,Param,,,string
+marginal_cost,Param,"G,T",0.,float
+capital_cost,Param,G,0.,float
+bus,Param,G,,string
+p,Variable,"G,T",0,float

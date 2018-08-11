@@ -28,7 +28,7 @@ function build(c::Generator)
     @emvariable c c[:p_min_pu][g,t] * c[:p_nom][g] <= p[g=G,t=T] <= c[:p_max_pu][g,t] * c[:p_nom][g]
 end
 
-addelement(Generator)
+addelement(Generator, :generators, (:G, :T=>:snapshots), joinpath(@__DIR__, "generators.csv"))
 
 ## StorageUnit
 cost(c::StorageUnit) = sum(c[:marginal_cost] .* c[:p_dispatch]) + sum(c[:capital_cost] .* c[:p_nom])
@@ -68,7 +68,7 @@ function build(c::StorageUnit)
                   + c[:inflow][s,t] - c[:spill][s,t])
 end
 
-addelement(StorageUnit)
+addelement(StorageUnit, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "storageunits.csv"))
 
 # add_component(StorageUnit, "storageunits", Axes(:S, :T=>:snapshots), joinpath(@__DIR__, "storageunits.csv"))
 # VarParam(:p_nom, 0, :S), Param(:p_nom_min, 0, :S), Param(:p_nom_max, Inf, :S),
@@ -98,11 +98,11 @@ function build(c::Store)
                   c[:e][s,t] - (1 - c[:standing_loss][s]) * e_prev[s,t] == c[:p])
 end
 
-addelement(Store)
+addelement(Store, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "stores.csv"))
 
 ## Load
 cost(c::Load) = 0.
 nodalbalance(c::Load) = (p = c[:p_set]; (c[:bus] => (l,t)->-p[l,t],))
 build(c::Load) = nothing
 
-addelement(Load)
+addelement(Load, :loads, (:L,), joinpath(@__DIR__, "loads.csv"))

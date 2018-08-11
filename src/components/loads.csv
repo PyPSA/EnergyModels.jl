@@ -1,0 +1,3 @@
+attribute,quantitytype,dimensions,default,dtype
+bus,Param,L,,string
+p_set,Param,"L,T",0,float

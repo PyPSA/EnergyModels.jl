@@ -1,0 +1,15 @@
+attribute,quantitytype,dimensions,default,dtype
+bus0,Param,L,,string
+bus1,Param,L,,string
+carrier,Param,,AC,string
+s_nom,VarParam,L,0,float
+s_nom_min,Param,L,0,float
+s_nom_max,Param,L,Inf,float
+s_max_pu,Param,"L,T",1,float
+type,Param,,,string
+num_parallel,Param,L,1,float
+length,Param,L,0,float
+x,Param,L,0,float
+r,Param,L,0,float
+capital_cost,Param,L,0,float
+p,Variable,"L,T",0,float

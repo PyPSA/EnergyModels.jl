@@ -1,0 +1,13 @@
+attribute,quantitytype,dimensions,default,dtype
+bus0,Param,L,,string
+bus1,Param,L,,string
+efficiency,Param,"L,T",1,float
+length,Param,L,0,float
+p_nom,VarParam,L,0,float
+p_nom_min,Param,L,0,float
+p_nom_max,Param,L,Inf,float
+p_min_pu,Param,"L,T",0,float
+p_max_pu,Param,"L,T",1,float
+capital_cost,Param,L,0,float
+marginal_cost,Param,"L,T",0,float
+p,Variable,"L,T",0,float

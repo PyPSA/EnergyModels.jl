@@ -1,0 +1,5 @@
+attribute,quantitytype,dimensions,default,dtype
+x,Param,B,,float
+y,Param,B,,float
+carrier,Param,,,string
+v_nom,Param,B,,float

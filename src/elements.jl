@@ -40,7 +40,7 @@ function build(m::EnergyModel, bus::Bus)
     @emconstraint(bus, balance[b=B,t=T], sum(f(l,t) for (idx, f)=terms, l=idx[b]) == 0)
 end
 
-addelement(Bus{EnergyModel})
+addelement(Bus{EnergyModel}, :buses, (:B, :T=>:snapshots), joinpath(@__DIR__, "components", "buses.csv"))
 
 function build(m::EnergyModel, sn::SubNetwork)
     T = axis(sn.model, :snapshots)
@@ -58,4 +58,4 @@ function build(m::EnergyModel, sn::SubNetwork)
     @emconstraint(sn, cycles[c=1:size(C,2),t=T], sum(Cv[j] * effimp[Cl[j]] * p[Cl[j],t] for j=nzrange(C,c)) == 0)
 end
 
-addelement(SubNetwork{EnergyModel})
+addelement(SubNetwork{EnergyModel}, :subnetworks)

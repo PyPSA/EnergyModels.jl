@@ -1,0 +1,14 @@
+attribute,quantitytype,dimensions,default,dtype
+bus,Param,S,,string
+e_nom,VarParam,S,0,float
+e_max_pu,Param,"S,T",1,float
+e_min_pu,Param,"S,T",-1,float
+e_nom_min,Param,S,0,float
+e_nom_max,Param,S,Inf,float
+e_initial,Param,S,0,float
+e_cyclic,Param,,f,bool
+standing_loss,Param,S,0,float
+marginal_cost,Param,"S,T",0,float
+capital_cost,Param,S,0,float
+e,Variable,"S,T",0,float
+p,Variable,"S,T",0,float
