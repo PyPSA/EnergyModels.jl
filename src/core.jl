@@ -98,8 +98,8 @@ function getjump(e::ModelElement, attr::Symbol)
     haskey(jm.objDict, name) ? AxisArray(jm[name]) : nothing
 end
 getvariable(e::ModelElement, attr::Symbol) = getjump(e, attr)
-getvalue(e::ModelElement, attr::Symbol) = getvalue(getjump(e, attr))
-getdual(e::ModelElement, attr::Symbol) = getdual(getjump(e, attr))
+JuMP.getvalue(e::ModelElement, attr::Symbol) = getvalue(getjump(e, attr))
+JuMP.getdual(e::ModelElement, attr::Symbol) = getdual(getjump(e, attr))
 getparam(e::ModelElement, attr::Symbol) = get(model(e).data, e, attr)
 
 function Base.getindex(m::EnergyModel, class::Symbol)

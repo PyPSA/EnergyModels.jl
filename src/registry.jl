@@ -29,5 +29,5 @@ end
 function naming(T::ElementType)
     haskey(elemtypenames, T) && return elemtypenames[T]
     s = lowercase(string(T.name.name))
-    Symbol(s, (s[end] == 's' ? "es" : "s"))
+    Symbol(s, in(s[end], ('s', 'h')) ? "es" : "s")
 end

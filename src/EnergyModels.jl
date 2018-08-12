@@ -26,8 +26,9 @@ include("components/oneport.jl")
 include("components/branch.jl")
 
 export @emvariable, @emconstraint, build, solve, components, subnetworks, buses,
-    push!, axis, graph, determine_subnetworks!, jumpmodel, Component,
-    EnergyModel, SubNetwork, Bus, Line, Transformer, Link, Load, Generator,
-    StorageUnit, Store
+    push!, axis, graph, determine_subnetworks!, jumpmodel, getvalue, getdual,
+    getparam, Component, EnergyModel, SubNetwork, Bus, Line, Transformer, Link,
+    Load, Generator, StorageUnit, Store, Branch, PassiveBranch, ActiveBranch,
+    OnePort
 
 end # module
