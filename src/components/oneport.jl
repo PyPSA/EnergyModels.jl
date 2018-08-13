@@ -63,20 +63,12 @@ function build(c::StorageUnit)
 
     @emconstraint(c, soc_eq[s=S, t=T],
                   soc[s,t] - soc_prev[s,t]
-                  == c[:p_store][s,t] * c[:efficiency_store][s]
-                  - c[:p_dispatch][s,t] / c[:efficiency_dispatch][s]
+                  == c[:p_store][s,t] * c[:efficiency_store][s,t]
+                  - c[:p_dispatch][s,t] / c[:efficiency_dispatch][s,t]
                   + c[:inflow][s,t] - c[:spill][s,t])
 end
 
 addelement(StorageUnit, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "storageunits.csv"))
-
-# add_component(StorageUnit, "storageunits", Axes(:S, :T=>:snapshots), joinpath(@__DIR__, "storageunits.csv"))
-# VarParam(:p_nom, 0, :S), Param(:p_nom_min, 0, :S), Param(:p_nom_max, Inf, :S),
-# Variable(:p, 0, :S, :T), Param(:p_min_pu, -1, :S, :T), Param(:p_max_pu, 1, :S, :T),
-# Param(:efficiency_store, 1, :S, :T), Param(:efficiency_dispatch, 1, :S, :T),
-# Param(:standing_loss, 0, :S, :T), Param(:efficiency_dispatch, 1, :S, :T),
-
-
 
 ## Store
 cost(c::Store) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:e_nom] - getparam(c, :e_nom)))
