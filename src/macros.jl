@@ -37,7 +37,7 @@ function extract_component_vars!(code, c, ex, axes=nothing)
 
     function pullout(T, S)
         v = gensym()
-        reprs = (axes !== nothing && S !== nothing) ? maybe_escape.(getindex.(axes, S)) : []
+        reprs = (axes !== nothing && S !== nothing) ? maybe_escape.(map(s->axes[s], S)) : []
         push!(code.args, :($(esc(v)) = view($(esc(c)), $T, ($(reprs...),))))
         S === nothing ? v : Expr(:ref, v, S...)
     end
@@ -57,12 +57,11 @@ function embuildrefsets!(initcode, c, var, escvarname)
 
     axisreprs = Dict{Symbol,AxisRepr}()
     for (i, idxpair) = enumerate(idxpairs)
-        if isexpr(idxpair.idxset, :quote)
+        if idxpair.idxset isa QuoteNode
             s = gensym()
-            name = idxpair.idxset.args[1]
+            name = idxpair.idxset.value
+            push!(initcode.args, :($s = axis($(esc(c)), $(idxpair.idxset))))
             idxpair.idxset = idxsets[i] = s
-            push!(initcode.args, :($s = axis($(esc(c)), $(quot(name)))))
-
             axisrepr = AxisRepr(s, name)
         else
             axisrepr = AxisRepr(idxpair.idxset, nothing)
@@ -163,7 +162,7 @@ macro emvariable(c, args...)
     extra_kwargs = filter(kw -> !isinfokeyword(kw), kwargs)
     infoexpr = VariableInfoExpr(; keywordify.(info_kwargs)...)
 
-    ex = shift!(args)
+    ex = popfirst!(args)
 
     if isa(ex, Symbol)
         # fast-track for an unbounded singleton var

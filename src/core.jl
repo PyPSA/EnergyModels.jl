@@ -83,9 +83,8 @@ naming(c::Component) = c.class
 naming(e::ModelElement) = e.name
 naming(e::ModelElement, args...) = Symbol(naming(e), flatten(("::", a) for a=args)...)
 
-# Slight pun
-Base.findin(c::Component, buses) = intersect((findin(c[attr], buses) for attr = busattributes(c))...)
-Base.findin(c::Bus, buses) = findin(axis(c), buses)
+Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Component) = intersect((findall(pred, c[attr]) for attr = busattributes(c))...)
+Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Bus) = findall(pred, axis(c).val)
 
 isvar(m::EnergyModel, e::ModelElement, attr::Symbol) = isvar(m.data, e, attr)
 isvar(e::ModelElement, attr::Symbol) = isvar(model(e), e, attr)

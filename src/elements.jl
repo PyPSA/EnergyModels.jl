@@ -8,20 +8,20 @@ expression(c::ModelElement, ::ExpressionType) = error("Not implemented")
 expression(c::Component, ::Cost) = cost(c)
 
 function build(m::EnergyModel)
-    info("* Equations for individual components")
+    @info("* Equations for individual components")
     for c = components(m)
-        info("  - ", naming(c), " (", naming(typeof(c)), ")")
+        @info("  - $(naming(c)) ($(naming(typeof(c))))")
         build(m, c)
     end
-    info("* Equations for energy balance")
+    @info("* Equations for energy balance")
     for c = buses(m)
         build(m, c)
     end
-    info("* Equations for subnetworks")
+    @info("* Equations for subnetworks")
     for sn = subnetworks(m)
         build(m, sn)
     end
-    info("* Cost minimization objective")
+    @info("* Cost minimization objective")
     @objective(m.jump, Min, sum(cost(c) for c = components(m)))
 
     jumpmodel(m) # jupyterlab breaks when trying to display a huge model
@@ -34,7 +34,7 @@ function build(m::EnergyModel, bus::Bus)
 
     terms = []
     for c = components(m), (buses, func) = nodalbalance(c)
-        push!(terms, (Dict(b=>find(buses .== b) for b=B), func))
+        push!(terms, (Dict(b=>findall(isequal(b), buses) for b=B), func))
     end
 
     @emconstraint(bus, balance[b=B,t=T], sum(f(l,t) for (idx, f)=terms, l=idx[b]) == 0)

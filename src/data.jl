@@ -91,7 +91,7 @@ function DictData(data::Dict{Symbol, AxisArray}; variables=Dict{Symbol,Set}())
         end
     end
 
-    components = unique((Symbol.(split(string(k), "::")[[1,2]])...) for k = keys(data))
+    components = unique((Symbol.(split(string(k), "::")[[1,2]])...,) for k = keys(data))
 
     DictData(axs, data, variables, components)
 end

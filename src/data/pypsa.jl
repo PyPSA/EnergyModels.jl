@@ -1,6 +1,5 @@
 using DataFrames
 using CSV
-using Missings
 
 abstract type AbstractPypsaAttrInfo end
 
@@ -33,14 +32,14 @@ struct PypsaNcData <: AbstractNcData
     classinfos::Dict{Symbol}{PypsaClassInfo}
 end
 
-function maybe_as_range(x::Vector{T}) where T<:Number
-    if length(x) < 3 return x end
+function maybe_as_range(x::AbstractArray{T,1}) where T<:Number
+    if length(x) < 3 return Vector(x) end
     d = diff(x)
     s = d[1]
     if all(d .== s)
         s == 1 ? (x[1]:x[end]) : (x[1]:s:x[end])
     else
-        x
+        Vector(x)
     end
 end
 
@@ -69,7 +68,7 @@ PypsaAttrInfo(::Type{Val{:static}}, attr, name, ds, attrname, _, indices, names)
 
 function PypsaAttrInfo(::Type{Val{:series}}, attr, name, ds, attrname, attrname_t, indices, names)
     attrname_t_i = attrname_t * "_i"
-    indices_t = findin(haskey(ds, attrname_t_i) ? ds[attrname_t_i][:] : [], names)
+    indices_t = haskey(ds, attrname_t_i) ? findall(in(ds[attrname_t_i][:]), names) : []
     if length(indices_t) == 0
         PypsaAttrInfo(Val{:static}, attr, name, ds, attrname, attrname_t, indices, names)
     else
@@ -196,7 +195,7 @@ function PypsaNcData(ds)
     #     key = string(c.listname, "_t_", attr, "_i")
     #     if haskey(ds, key)
     #         df[attr] = false
-    #         df[attr][findin(df[:name], as_data(ds[key]))] = true
+    #         df[attr][findall(in(df[:name]), as_data(ds[key]))] = true
     #     end
     # end
     # map(groupby(df, df.colindex.colnames[2:end])) do x

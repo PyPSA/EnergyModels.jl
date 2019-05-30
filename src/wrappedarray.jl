@@ -35,8 +35,8 @@ end
 function axisdim(::Type{WrappedArray{T,N,M,D,Ax}}, ::Type{<:Axis{name,S} where S}) where {T,N,M,D,Ax,name}
     isa(name, Int) && return name <= N ? name : error("axis $name greater than array dimensionality $N")
     names = axisnames(Ax)
-    idx = findfirst(names, name)
-    idx == 0 && error("axis $name not found in array axes $names")
+    idx = findfirst(isequal(name), names)
+    isnothing(idx) && error("axis $name not found in array axes $names")
     idx
 end
 
@@ -49,35 +49,35 @@ axisvalues(A::WrappedArray) = axisvalues(A.axes...)
 @generated function Base.getindex(A::WrappedArray{T,N,M,D,Ax}, idxs...) where {T,N,M,D,Ax}
     meta = Expr(:meta, :inline, :propagate_inbounds)
     names = axisnames(A)
-    :($meta; A.data[$((Expr(:ref, :idxs, findfirst(names, n)) for n=axisnames(D))...)])
+    :($meta; A.data[$((Expr(:ref, :idxs, something(findfirst(isequal(n), names))) for n=axisnames(D))...)])
 end
 
-# RelIterators allow to use + Int, and - Int to get to adjacent indices, BUT
-# they are about a 100x slower, so should be used sparingly
+# # RelIterators allow to use + Int, and - Int to get to adjacent indices, BUT
+# # they are about a 100x slower, so should be used sparingly
 
-struct RelativeIndex{Ax}
-    ax::Ax
-    i::Int64
-end
+# struct RelativeIndex{Ax}
+#     ax::Ax
+#     i::Int64
+# end
 
-struct RelativeIterator{Ax}
-    ax::Ax
-end
+# struct RelativeIterator{Ax}
+#     ax::Ax
+# end
 
-Base.start(it::RelativeIterator) = 1
-Base.done(it::RelativeIterator, state) = state == length(it.ax) + 1
-Base.next(it::RelativeIterator, state) = RelativeIndex(it.ax, state), state + 1
-Base.length(it::RelativeIterator) = length(it.ax)
-Base.:+(r::RelativeIndex, d::Int) = RelativeIndex(r.ax, r.i+d)
-Base.:-(r::RelativeIndex, d::Int) = RelativeIndex(r.ax, r.i-d)
+# Base.start(it::RelativeIterator) = 1
+# Base.done(it::RelativeIterator, state) = state == length(it.ax) + 1
+# Base.next(it::RelativeIterator, state) = RelativeIndex(it.ax, state), state + 1
+# Base.length(it::RelativeIterator) = length(it.ax)
+# Base.:+(r::RelativeIndex, d::Int) = RelativeIndex(r.ax, r.i+d)
+# Base.:-(r::RelativeIndex, d::Int) = RelativeIndex(r.ax, r.i-d)
 
-# We intercept the getindex calls of JuMPArray and AxisArray to resolve to the
-# actual index value
-for T = (:(JuMP.JuMPArray), :AxisArray)
-    @eval Base.getindex(a::$T, r::RelativeIndex) = a[r.ax[r.i]]
-end
+# # We intercept the getindex calls of JuMPArray and AxisArray to resolve to the
+# # actual index value
+# for T = (:(JuMP.JuMPArray), :AxisArray)
+#     @eval Base.getindex(a::$T, r::RelativeIndex) = a[r.ax[r.i]]
+# end
 
-@inline unrelative(it) = it
-@inline unrelative(it::RelativeIterator) = it.ax
+# @inline unrelative(it) = it
+# @inline unrelative(it::RelativeIterator) = it.ax
 
-_to_axis(it::RelativeIterator, axes...) = (unrelative(it), _to_axis(axes...)...)
+# _to_axis(it::RelativeIterator, axes...) = (unrelative(it), _to_axis(axes...)...)

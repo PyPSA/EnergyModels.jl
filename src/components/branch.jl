@@ -58,7 +58,7 @@ phaseshift(c::PassiveBranch) = 0.
 function impedance(c::Line)
     ax = axis(c)
     bus_v_nom = c.model[Bus][:v_nom]
-    v_nom = bus_v_nom[indexin(c[:bus0], first(axisvalues(bus_v_nom)))]
+    v_nom = bus_v_nom[convert(Array{Int64}, indexin(c[:bus0], first(axisvalues(bus_v_nom))))]
 
     p = gettypeparams(c.model.data, c, c.class)
     if p !== nothing

@@ -17,9 +17,9 @@ addelement(::Type{T}, name::Symbol, eq::ElementAttributes) where T<:ModelElement
 
 function addelement(::Type{T}, name::Symbol, axes, filename) where T<:ModelElement
     axes = (first(axes)=>name, Base.tail(axes)...)
-    df =  CSV.read(filename, truestring="t", falsestring="f")
+    df = CSV.read(filename, truestrings=["t"], falsestrings=["f"])
     df[:attribute] = Symbol.(df[:attribute])
-    df[:default] = map(r->typeparsers[r[:dtype]](r[:default]), eachrow(df))
+    df[:default] = map(r->astype(r[:dtype], r[:default]), eachrow(df))
     rename_dimensions(x) = tuple(recode(Symbol.(split(x, ',')), axes...)...)
     df[:dimensions] = map(x->ismissing(x) ? () : rename_dimensions(x), df[:dimensions])
 
