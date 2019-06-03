@@ -6,6 +6,7 @@ for component = (:Generator, :Load, :StorageUnit, :Store)
         struct $component <: OnePort
             model::EnergyModel
             class::Symbol
+            objects::Dict{Symbol,Any}
         end
     end
 end
@@ -17,15 +18,29 @@ cost(c::OnePort) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[
 nodalbalance(c::OnePort) = (p = c[:p]; (c[:bus] => (o,t)->p[o,t],))
 
 ## Generator
-function build(c::Generator)
+function addto!(jm::ModelView, m::EnergyModel, c::Generator)
     T = axis(c, :snapshots)
     G = axis(c)
 
-    if isvar(c, :p_nom)
-        @emvariable c c[:p_nom_min][g] <= p_nom[g=G] <= c[:p_nom_max][g]
-    end
+    p_min_pu = get(c, :p_min_pu, G, T)
+    p_max_pu = get(c, :p_max_pu, G, T)
 
-    @emvariable c c[:p_min_pu][g,t] * c[:p_nom][g] <= p[g=G,t=T] <= c[:p_max_pu][g,t] * c[:p_nom][g]
+    if isvar(c, :p_nom)
+        p_nom_min = get(c, :p_nom_min, G)
+        p_nom_max = get(c, :p_nom_max, G)
+        @variables jm begin
+            p_nom_min[g] <= p_nom[g=G] <= p_nom_max[g]
+            p[g=G,t=T]
+        end
+
+        @constraints jm begin
+            p_lower[g=G,t=T], p[g,t] >= p_min_pu[g,t] * p_nom[g]
+            p_upper[g=G,t=T], p[g,t] <= p_max_pu[g,t] * p_nom[g]
+        end
+    else
+        p_nom = get(c, :p_nom, G)
+        @variable(jm, p_min_pu[g,t] * p_nom[g] <= p[g=G,t=T] <= p_max_pu[g,t] * p_nom[g])
+    end
 end
 
 addelement(Generator, :generators, (:G, :T=>:snapshots), joinpath(@__DIR__, "generators.csv"))
@@ -39,51 +54,99 @@ function nodalbalance(c::StorageUnit)
     (c[:bus] => (s,t)->p_dispatch[s,t] - p_store[s,t],)
 end
 
-function build(c::StorageUnit)
+function addto!(jm::ModelView, m::EnergyModel, c::StorageUnit)
     T = axis(c, :snapshots)
     S = axis(c)
 
+    p_min_pu = get(c, :p_min_pu, S, T)
+    p_max_pu = get(c, :p_max_pu, S, T)
+
     if isvar(c, :p_nom)
-        @emvariable c c[:p_nom_min][s] <= p_nom[s=S] <= c[:p_nom_max][s]
-    end
+        p_nom_min = get(c, :p_nom_min, S)
+        p_nom_max = get(c, :p_nom_max, S)
 
-    @emvariable c 0 <= p_dispatch[s=S,t=T] <= c[:p_max_pu][s,t] * c[:p_nom][s]
-    @emvariable c 0 <= p_store[s=S, t=T] <= - c[:p_min_pu][s,t] * c[:p_nom][s]
-    @emvariable c 0 <= state_of_charge[s=S,t=T] <= c[:max_hours][s,t] * c[:p_nom][s]
-    @emvariable c 0 <= spill[s=S,t=T] <= c[:inflow][s,t]
+        @variables jm begin
+            p_nom_min[s] <= p_nom[s=S] <= p_nom_max[s]
+            p_store[s=S,t=T] >= 0
+            p_dispatch[s=S,t=T] >= 0
+        end
 
-    soc = c[:state_of_charge]
-    if c[:cyclic_state_of_charge]
-        soc_prev = circshift(soc, :snapshots=>1)
+        @constraints jm begin
+            p_lower[s=S,t=T], p_store[s,t] <= - p_min_pu[s,t] * p_nom[s]
+            p_upper[s=S,t=T], p_dispatch[s,t] <= p_max_pu[s,t] * p_nom[s]
+        end
     else
-        soc_prev = similar(soc, Union{Float64,eltype(soc)})
-        soc_prev[:,1] .= c[:state_of_charge_initial]
-        soc_prev[:,2:end] .= soc[:,1:end-1]
+        p_nom = get(c, :p_nom, S)
+
+        @variables jm begin
+            0 <= p_store[s=S,t=T] <= - p_min_pu[s,t] * p_nom[s]
+            0 <= p_dispatch[s=S,t=T] <= p_max_pu[s,t] * p_nom[s]
+        end
     end
 
-    @emconstraint(c, soc_eq[s=S, t=T],
-                  soc[s,t] - soc_prev[s,t]
-                  == c[:p_store][s,t] * c[:efficiency_store][s,t]
-                  - c[:p_dispatch][s,t] / c[:efficiency_dispatch][s,t]
-                  + c[:inflow][s,t] - c[:spill][s,t])
+    inflow = get(c, :inflow, S, T)
+    max_hours = get(c, :max_hours, S, T)
+    efficiency_store = get(c, :efficiency_store, S, T)
+    efficiency_dispatch = get(c, :efficiency_dispatch, S, T)
+
+    @variables jm begin
+        0 <= spill[s=S,t=T] <= inflow[s,t]
+        0 <= state_of_charge[s=S,t=T]
+    end
+
+    @constraint(jm, state_of_charge_upper[s=S,t=T], state_of_charge[s,t] <= max_hours[s,t] * p_nom[s])
+
+    if c[:cyclic_state_of_charge]
+        soc_prev = circshift(state_of_charge, :snapshots=>1)
+    else
+        soc_prev = similar(state_of_charge, Union{Float64,eltype(soc)})
+        soc_prev[:,1] .= get(c, :state_of_charge_initial, S)
+        soc_prev[:,2:end] .= state_of_charge[:,1:end-1]
+    end
+
+    @constraint(jm, state_of_charge_eq[s=S, t=T],
+                state_of_charge[s,t] - soc_prev[s,t]
+                == p_store[s,t] * efficiency_store[s,t]
+                - p_dispatch[s,t] / efficiency_dispatch[s,t]
+                + inflow[s,t] - spill[s,t])
 end
 
 addelement(StorageUnit, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "storageunits.csv"))
 
 ## Store
 cost(c::Store) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:e_nom] - getparam(c, :e_nom)))
-function build(c::Store)
+function addto!(jm::ModelView, m::EnergyModel, c::Store)
     T = axis(c, :snapshots)
     S = axis(c)
 
+    e_min_pu = get(c, :e_min_pu, S, T)
+    e_max_pu = get(c, :e_max_pu, S, T)
+
     if isvar(c, :e_nom)
-        @emvariable c c[:e_nom_min][s] <= e_nom[s=S] <= c[:e_nom_max][s]
+        e_nom_min = get(c, :e_nom_min, S)
+        e_nom_max = get(c, :e_nom_max, S)
+
+        @variables jm begin
+            e_nom_min[s] <= e_nom[s=S] <= e_nom_max[s]
+            e[s=S,t=T]
+        end
+
+        @constraints jm begin
+            e_lower[s=S,t=T], e[s,t] >= e_min_pu[s,t] * e_nom[s]
+            e_upper[s=S,t=T], e[s,t] <= e_max_pu[s,t] * e_nom[s]
+        end
+    else
+        e_nom = get(c, :e_nom, S)
+
+        @variables jm begin
+            e_min_pu[s,t] * e_nom[s] <= e[s=S,t=T] <= e_max_pu[s,t] * e_nom[s]
+        end
     end
 
-    @emvariable c c[:e_min_pu][s,t] * c[:e_nom][s] <= e[s=S,t=T] <= c[:e_max_pu][s,t] * c[:e_nom][s]
-    @emvariable c p[s=S,t=T]
+    @variable(jm, p[s=S,t=T])
 
-    e = c[:e]
+    standing_loss = get(c, :standing_loss, S)
+
     if c[:e_cyclic]
         e_prev = circshift(e, :snapshots=>1)
     else
@@ -91,8 +154,8 @@ function build(c::Store)
         e_prev[:,1] .= c[:e_initial]
         e_prev[:,2:end] .= e[:,1:end-1]
     end
-    @emconstraint(c, e_eq[s=S, t=T],
-                  c[:e][s,t] - (1 - c[:standing_loss][s]) * e_prev[s,t] == c[:p])
+    @constraint(jm, e_eq[s=S, t=T],
+                e[s,t] - (1 - standing_loss[s]) * e_prev[s,t] == p)
 end
 
 addelement(Store, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "stores.csv"))
@@ -100,6 +163,6 @@ addelement(Store, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "stores.csv"
 ## Load
 cost(c::Load) = 0.
 nodalbalance(c::Load) = (p = c[:p_set]; (c[:bus] => (l,t)->-p[l,t],))
-build(c::Load) = nothing
+addto!(jm::JuMP.AbstractModel, m::EnergyModel, c::Load) = nothing
 
 addelement(Load, :loads, (:L,), joinpath(@__DIR__, "loads.csv"))
