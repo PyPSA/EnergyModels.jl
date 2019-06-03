@@ -27,9 +27,9 @@ using SparseArrays
 
 include("core.jl")
 include("compat.jl")
+include("modelview.jl")
 include("wrappedarray.jl")
 include("registry.jl")
-include("macros.jl")
 include("graph.jl")
 include("data.jl")
 include("containerviews.jl")
