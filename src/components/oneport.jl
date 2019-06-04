@@ -14,9 +14,9 @@ end
 busattributes(c::OnePort) = (:bus,)
 
 ## Defaults for OnePort
-cost(c::OnePort) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
+cost(c::OnePort) = sum(c[:marginal_cost] .* AxisArray(c[:p])) + sum(c[:capital_cost] .* (AxisArray(c[:p_nom]) .- getparam(c, :p_nom)))
 function p(c::OnePort)
-    p = c[:p]
+    p = AxisArray(c[:p])
     ((o,t)->p[o,t],)
 end
 
@@ -49,10 +49,10 @@ end
 addelement(Generator, :generators, (:G, :T=>:snapshots), joinpath(@__DIR__, "generators.csv"))
 
 ## StorageUnit
-cost(c::StorageUnit) = sum(c[:marginal_cost] .* c[:p_dispatch]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
+cost(c::StorageUnit) = sum(c[:marginal_cost] .* AxisArray(c[:p_dispatch])) + sum(c[:capital_cost] .* (AxisArray(c[:p_nom]) - getparam(c, :p_nom)))
 function p(c::StorageUnit)
-    p_dispatch = c[:p_dispatch]
-    p_store = c[:p_store]
+    p_dispatch = AxisArray(c[:p_dispatch])
+    p_store = AxisArray(c[:p_store])
 
     ((s,t)->p_dispatch[s,t] - p_store[s,t],)
 end
@@ -117,7 +117,7 @@ end
 addelement(StorageUnit, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "storageunits.csv"))
 
 ## Store
-cost(c::Store) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:e_nom] - getparam(c, :e_nom)))
+cost(c::Store) = sum(c[:marginal_cost] .* AxisArray(c[:p])) + sum(c[:capital_cost] .* (AxisArray(c[:e_nom]) - getparam(c, :e_nom)))
 function addto!(jm::ModelView, m::EnergyModel, c::Store)
     T = axis(c, :snapshots)
     S = axis(c)
@@ -166,7 +166,7 @@ addelement(Store, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "stores.csv"
 ## Load
 cost(c::Load) = 0.
 function p(c::Load)
-    p = c[:p_set]
+    p = AxisArray(c[:p_set])
     ((l,t)->-p[l,t],)
 end
 addto!(jm::JuMP.AbstractModel, m::EnergyModel, c::Load) = nothing

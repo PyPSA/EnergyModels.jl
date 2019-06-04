@@ -14,7 +14,7 @@ end
 
 busattributes(c::Branch) = (:bus0, :bus1)
 function p(c::Branch)
-    p = c[:p]
+    p = AxisArray(c[:p])
     ((b,t)->p[b,t],   # :bus0
      (b,t)->-p[b,t])  # :bus1
 end
@@ -25,13 +25,13 @@ end
 # nodalbalance(c::Link) = @emaggregator(c, l, c[:bus0] => c[:p][l], c[:bus1] => -c[:p][l])
 
 function p(c::Link)
-    p = c[:p]
+    p = AxisArray(c[:p])
     eff = c[:efficiency]
     ((l,t)->-p[l,t],       # :bus0
      (l,t)->eff[l]*p[l,t]) # :bus1
 end
 
-cost(c::Link) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
+cost(c::Link) = sum(c[:marginal_cost] .* AxisArray(c[:p])) + sum(c[:capital_cost] .* (AxisArray(c[:p_nom]) - getparam(c, :p_nom)))
 function addto!(jm::ModelView, m::EnergyModel, c::Link)
     T = axis(m, :snapshots)
     L = axis(c)
@@ -175,7 +175,7 @@ function impedance(c::Transformer)
 end
 
 
-cost(c::PassiveBranch) = sum(c[:capital_cost] .* (c[:s_nom] .- getparam(c, :s_nom)))
+cost(c::PassiveBranch) = sum(c[:capital_cost] .* (AxisArray(c[:s_nom]) .- getparam(c, :s_nom)))
 
 function addto!(jm::ModelView, m::EnergyModel, c::PassiveBranch)
     T = axis(m, :snapshots)

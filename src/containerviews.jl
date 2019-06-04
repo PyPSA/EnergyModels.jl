@@ -34,9 +34,8 @@ end
 
 mapcat(f::Function, cv::AbstractContainerView) = cat(cv, collect(components(cv)), map(f, components(cv)))
 
-# TODO Are both definitions necessary?
-Base.get(cv::AbstractContainerView, i) = mapcat(c->c[i], cv)
-Base.get(cv::AbstractContainerView, i::Symbol) = mapcat(c->c[i], cv)
+# TODO The AxisArray that is spliced in here is a mild hack!
+Base.get(cv::AbstractContainerView, i) = mapcat(c->AxisArray(get(c, i)), cv)
 Base.get(cv::AbstractContainerView, i, axes...) = WrappedArray(get(cv, i), axes...)
 
 Base.getindex(cv::AbstractContainerView, i) = get(cv, i)
