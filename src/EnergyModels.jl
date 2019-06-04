@@ -27,9 +27,10 @@ using SparseArrays
 
 include("core.jl")
 include("compat.jl")
+include("macros.jl")
+include("modelview.jl")
 include("wrappedarray.jl")
 include("registry.jl")
-include("macros.jl")
 include("graph.jl")
 include("data.jl")
 include("containerviews.jl")
@@ -38,8 +39,8 @@ include("elements.jl")
 include("components/oneport.jl")
 include("components/branch.jl")
 
-export @emvariable, @emconstraint, build, solve, components, subnetworks, buses,
-    push!, axis, graph, determine_subnetworks!, jumpmodel, getvalue, getdual,
+export @emvariable, @emconstraint, addto!, optimize!, components, subnetworks, buses,
+    push!, axis, graph, determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual,
     getparam
 
 # Components

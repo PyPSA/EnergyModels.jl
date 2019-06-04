@@ -1,4 +1,4 @@
-const ElementType = Type{<:ModelElement}
+const ElementType = Type{<:Element}
 struct ElementAttributes
     elemtype::ElementType
     attributes::DataFrame
@@ -10,12 +10,12 @@ const elements = Dict{Symbol,ElementAttributes}()
 resolve(elemtypename::Symbol) = elements[elemtypename].elemtype
 attributes(elemtypename::Symbol) = elements[elemtypename].attributes
 
-addelement(::Type{T}) where T<:ModelElement = addelement(T, naming(T))
-addelement(::Type{T}, name::Symbol) where T<:ModelElement = addelement(T, name, ElementAttributes(T, DataFrame()))
-addelement(::Type{T}, name::Symbol, eq::ElementAttributes) where T<:ModelElement =
+addelement(::Type{T}) where T<:Element = addelement(T, naming(T))
+addelement(::Type{T}, name::Symbol) where T<:Element = addelement(T, name, ElementAttributes(T, DataFrame()))
+addelement(::Type{T}, name::Symbol, eq::ElementAttributes) where T<:Element =
     (elements[name] = eq; elemtypenames[T] = name)
 
-function addelement(::Type{T}, name::Symbol, axes, filename) where T<:ModelElement
+function addelement(::Type{T}, name::Symbol, axes, filename) where T<:Element
     axes = (first(axes)=>name, Base.tail(axes)...)
     df = CSV.read(filename, truestrings=["t"], falsestrings=["f"])
     df[:attribute] = Symbol.(df[:attribute])

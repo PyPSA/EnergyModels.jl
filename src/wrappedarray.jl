@@ -1,11 +1,13 @@
 import AxisArrays: axisdim, axisnames, axisname, axisvalues
-import JuMP: JuMPArray
+
+# All ArrayTypes must define `axisnames` function
+const ArrayTypes{T,M} = Union{AxisArray{T,M}} # JuMP.JuMPArray{T,M}
 
 struct WrappedArray{T,N,M,D,Ax} <: AbstractArray{T,N}
     data::D
     axes::Ax
     # Duck-typing, we assume axisnames is defined for data
-    function WrappedArray(data::Union{AxisArray{T,M},JuMP.JuMPArray{T,M}}, axes::NTuple{N,Axis}) where {T,N,M}
+    function WrappedArray(data::ArrayTypes{T,M}, axes::NTuple{N,Axis}) where {T,N,M}
         @assert(issubset(axisnames(data), axisnames(axes...)),
                 "WrappedArray is missing axes: $(setdiff(axisnames(data), axisnames(axes...)))")
         new{T,N,M,typeof(data),typeof(axes)}(data, axes)

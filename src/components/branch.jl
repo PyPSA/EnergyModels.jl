@@ -9,31 +9,53 @@ abstract type ActiveBranch <: Branch end
 struct Link <: ActiveBranch
     model::EnergyModel
     class::Symbol
+    objects::Dict{Symbol,Any}
 end
 
 busattributes(c::Branch) = (:bus0, :bus1)
+function p(c::Branch)
+    p = c[:p]
+    ((b,t)->p[b,t],   # :bus0
+     (b,t)->-p[b,t])  # :bus1
+end
 
 # Possible ways to have an emaggregator macro
 # @emaggregator(nodalbalance, c::Link, l, c[:bus0] => c[:p][l], c[:bus1] => -c[:p][l])
 # oder
 # nodalbalance(c::Link) = @emaggregator(c, l, c[:bus0] => c[:p][l], c[:bus1] => -c[:p][l])
 
-function nodalbalance(c::Link)
+function p(c::Link)
     p = c[:p]
     eff = c[:efficiency]
-    (c[:bus0] => (l,t)->-p[l,t],
-     c[:bus1] => (l,t)->eff[l]*p[l,t])
+    ((l,t)->-p[l,t],       # :bus0
+     (l,t)->eff[l]*p[l,t]) # :bus1
 end
 
 cost(c::Link) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
-function build(c::Link)
+function addto!(jm::ModelView, m::EnergyModel, c::Link)
+    T = axis(m, :snapshots)
     L = axis(c)
 
-    if isvar(c, :p_nom)
-        @emvariable c c[:p_nom_min][l] <= p_nom[l=L] <= c[:p_nom_max][l]
-    end
+    p_min_pu = get(c, :p_min_pu, L, T)
+    p_max_pu = get(c, :p_max_pu, L, T)
 
-    @emvariable c c[:p_min_pu][l,t] * c[:p_nom][l] <= p[l=L,t=:snapshots] <= c[:p_max_pu][l,t] * c[:p_nom][l]
+    if isvar(c, :p_nom)
+        p_nom_min = get(c, :p_nom_min, L)
+        p_nom_max = get(c, :p_nom_max, L)
+
+        @variables jm begin
+            p_nom_min[l] <= p_nom[l=L] <= p_nom_max[l]
+            p[l=L,t=T]
+        end
+
+        @constraints jm begin
+            p_lower[l=L,t=T], p[l,t] >= p_min_pu[l,t] * p_nom[l]
+            p_upper[l=L,t=T], p[l,t] <= p_max_pu[l,t] * p_nom[l]
+        end
+    else
+        p_nom = get(c, :p_nom, L)
+        @variable(jm, p_min_pu[l,t] * p_nom[l] <= p[l=L,t=T] <= p_max_pu[l,t] * p_nom[l])
+    end
 end
 
 addelement(Link, :links, (:L, :T=>:snapshots), joinpath(@__DIR__, "links.csv"))
@@ -46,6 +68,7 @@ for component = (:Line, :Transformer)
         struct $component <: PassiveBranch
             model::EnergyModel
             class::Symbol
+            objects::Dict{Symbol,Any}
         end
     end
 end
@@ -70,9 +93,9 @@ function impedance(c::Line)
         r = AxisArray(p[:r_per_length] .* length ./ num_parallel, ax)
         # b = AxisArray(2pi*1e-9*p[:f_nom]*p[:c_per_length] .* length .* num_parallel, ax)
     else
-      x = c[:x]
-      r = c[:r]
-    # b = c[:b]
+        x = c[:x]
+        r = c[:r]
+        # b = c[:b]
     end
 
     x_pu = AxisArray(x ./ v_nom.^2, ax)
@@ -154,19 +177,29 @@ end
 
 cost(c::PassiveBranch) = sum(c[:capital_cost] .* (c[:s_nom] .- getparam(c, :s_nom)))
 
-function nodalbalance(c::Branch)
-    p = c[:p]
-    (c[:bus0] => (b,t)->p[b,t], c[:bus1] => (b,t)->-p[b,t])
-end
-
-function build(c::PassiveBranch)
+function addto!(jm::ModelView, m::EnergyModel, c::PassiveBranch)
+    T = axis(m, :snapshots)
     L = axis(c)
 
-    if isvar(c, :s_nom)
-        @emvariable c c[:s_nom_min][l] <= s_nom[l=L] <= c[:s_nom_max][l]
-    end
+    s_max_pu = get(c, :s_max_pu, L, T)
 
-    @emvariable c -c[:s_max_pu][l,t] * c[:s_nom][l] <= p[l=L,t=:snapshots] <= c[:s_max_pu][l,t] * c[:s_nom][l]
+    if isvar(c, :s_nom)
+        s_nom_min = get(c, :s_nom_min, L)
+        s_nom_max = get(c, :s_nom_max, L)
+
+        @variables jm begin
+            s_nom_min[l] <= s_nom[l=L] <= s_nom_max[l]
+            p[l=L,t=T]
+        end
+
+        @constraints jm begin
+            p_upper[l=L,t=T], p[l,t] <= s_max_pu[l,t] * s_nom[l]
+            p_lower[l=L,t=T], p[l,t] >= - s_max_pu[l,t] * s_nom[l]
+        end
+    else
+        s_nom = get(c, :s_nom, L)
+        @variable(jm, - s_max_pu[l,t] * s_nom[l] <= p[l=L,t=T] <= s_max_pu[l,t] * s_nom[l])
+    end
 end
 
 addelement(Line, :lines, (:L, :T=>:snapshots), joinpath(@__DIR__, "lines.csv"))

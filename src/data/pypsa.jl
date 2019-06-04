@@ -223,7 +223,7 @@ function Base.get(data::PypsaNcData, attrinfo::PypsaAttrInfo{T}, ax) where T
               ax, (axis(data, n) for n = dims)...)
 end
 
-function Base.get(data::PypsaNcData, element::ModelElement, param::Symbol)
+function Base.get(data::PypsaNcData, element::Element, param::Symbol)
     classinfo = data.classinfos[naming(element)]
     get(data, classinfo.attrinfos[param], classinfo.names)
 end
@@ -231,10 +231,10 @@ end
 gettypeparams(data::PypsaNcData, component::Component, class::Symbol) =
     data.classinfos[naming(component)].typeparams
 
-isvar(data::PypsaNcData, element::ModelElement, param::Symbol) =
+isvar(data::PypsaNcData, element::Element, param::Symbol) =
     in(param, data.classinfos[naming(element)].variables)
 
-axis(data::PypsaNcData, e::ModelElement) = data.classinfos[naming(e)].names
+axis(data::PypsaNcData, e::Element) = data.classinfos[naming(e)].names
 
 modelelements(data::PypsaNcData) = resolve.(data.elements)
 classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.elemtype === naming(T))
