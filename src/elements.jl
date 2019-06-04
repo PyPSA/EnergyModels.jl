@@ -60,7 +60,7 @@ function addto!(jm::ModelView, m::EnergyModel, sn::SubNetwork)
     B = axis(branches)
     length(B) == 0 && return
 
-    p = view(branches, :p, (B, T))
+    p = get(branches, :p, B, T)
     effimp = mapcat(effectiveimpedance, branches)
 
     C = cycle_matrix(sn)

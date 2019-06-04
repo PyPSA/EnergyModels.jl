@@ -29,5 +29,8 @@ end
 
 mapcat(f::Function, cv::AbstractContainerView) = cat(cv, collect(components(cv)), map(f, components(cv)))
 
-Base.getindex(cv::AbstractContainerView, i) = mapcat(c->c[i], cv)
-Base.getindex(cv::AbstractContainerView, i::Symbol) = mapcat(c->c[i], cv)
+# TODO Are both definitions necessary?
+Base.get(cv::AbstractContainerView, i) = mapcat(c->c[i], cv)
+Base.get(cv::AbstractContainerView, i::Symbol) = mapcat(c->c[i], cv)
+
+Base.getindex(cv::AbstractContainerView, i) = get(cv, i)

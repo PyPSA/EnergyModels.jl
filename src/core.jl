@@ -86,15 +86,6 @@ Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Bus) = findall(pred, axis(c
 isvar(m::EnergyModel, e::Element, attr::Symbol) = isvar(m.data, e, attr)
 isvar(e::Element, attr::Symbol) = isvar(model(e), e, attr)
 
-Base.getindex(e::Element, attr::Symbol) = (r = getjump(e, attr)) !== nothing ? r : getparam(e, attr)
-
-getjump(e::Element, attr::Symbol) = get(e.objects, attr, nothing)
-getvariable(e::Element, attr::Symbol) = getjump(e, attr)
-getconstraint(e::Element, attr::Symbol) = getjump(e, attr)
-JuMP.getvalue(e::Element, attr::Symbol) = getvalue.(getjump(e, attr))
-JuMP.getdual(e::Element, attr::Symbol) = getdual.(getjump(e, attr))
-getparam(e::Element, attr::Symbol) = get(model(e).data, e, attr)
-
 function Base.getindex(m::EnergyModel, class::Symbol)
     for t = (:components, :buses, :subnetworks)
         haskey(getfield(m, t), class) && return getfield(m, t)[class]
@@ -107,7 +98,47 @@ Base.getindex(m::EnergyModel, ::Type{Bus}) = ContainerView(m, Dict(c.name=>c for
 Base.getindex(sn::SubNetwork, T::Type{<:Component}) = SubContainerView(model(sn), Dict(c.class=>c for c=components(sn, T)), sn.buses)
 Base.getindex(sn::SubNetwork, ::Type{Bus}) = SubContainerView(model(sn), Dict(c.name=>c for c=buses(model(sn))), sn.buses)
 
-Base.view(e::Element, attr::Symbol, axes) = WrappedArray(e[attr], axes...)
+"""
+    Base.get(e::Element, attr::Symbol)
+    Base.get(e::Element, attr::Symbol, axes...)
+
+For the element `e` get the attribute `attr`, which is either the
+
+- JuMP variable or constraint, or the
+- parameter data from the `Data` object for the `class` of the element
+
+If `axes` are provided they must be `Symbol`s or AxisArrays.Axis objects, to
+specify which dimensions need to be added flexibly, ie by wrapping in a
+WrappedArray.
+
+If you want a JuMP object or a parameter specifically, use `getjump` or
+`getparam` instead.
+
+# Examples
+
+```julia
+c = m[:onwind]
+
+get(c, :p)   # gets the JuMP variable
+
+get(c, :p_max_pu) # gets the plant availability
+                  # (which might be static or a timeseries)
+
+get(c, :p_max_pu, axis(c), :snapshots) # plant availability as timeseries
+```
+"""
+function Base.get(e::Element, attr::Symbol)
+    ret = getjump(e, attr)
+    !isnothing(ret) ? ret : getparam(e, attr)
+end
+Base.get(e::Element, attr::Symbol, axes...) = WrappedArray(get(e, attr), axes...)
+
+Base.getindex(e::Element, attr::Symbol) = get(e, attr)
+
+getjump(e::Element, attr::Symbol) = get(e.objects, attr, nothing)
+JuMP.getvalue(e::Element, attr::Symbol) = getvalue.(getjump(e, attr))
+JuMP.getdual(e::Element, attr::Symbol) = getdual.(getjump(e, attr))
+getparam(e::Element, attr::Symbol) = get(model(e).data, e, attr)
 
 axis(m::EnergyModel, args...) = axis(m.data, args...)
 axis(e::Element) = axis(model(e), e)
