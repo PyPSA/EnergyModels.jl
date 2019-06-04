@@ -1,4 +1,4 @@
-abstract type AbstractContainerView{T} <: Container end
+abstract type AbstractContainerView{T} end
 
 struct ContainerView{T} <: AbstractContainerView{T}
     model::EnergyModel

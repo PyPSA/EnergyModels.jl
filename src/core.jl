@@ -69,16 +69,12 @@ Base.show(io::IO, c::Component) = print(io, typeof(c), " for class ", c.class)
 #     print(io, "* ", length(c.constrs), " constraints")
 # end
 
-
-jumpmodel(e::Element) = jumpmodel(model(e))
-jumpmodel(m::EnergyModel) = m.jumpmodel
-
 model(m::EnergyModel) = m
 model(e::Element) = e.model
 
 naming(c::Component) = c.class
 naming(e::Element) = e.name
-naming(e::Element, args...) = Symbol(naming(e), flatten(("::", a) for a=args)...)
+naming(e::Element, args...) = Symbol(naming(e), flatten((:(::), a) for a=args)...)
 
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Component) = intersect((findall(pred, c[attr]) for attr = busattributes(c))...)
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Bus) = findall(pred, axis(c).val)
@@ -143,6 +139,8 @@ getparam(e::Element, attr::Symbol) = get(model(e).data, e, attr)
 axis(m::EnergyModel, args...) = axis(m.data, args...)
 axis(e::Element) = axis(model(e), e)
 axis(e::Element, attr) = axis(model(e), attr)
+
+# TODO Are both container definitions necessary?
 axis(m::Container, T::Type{<:Element}) = axis(m[T])
 axis(m::EnergyModel, T::Type{<:Element}) = axis(m[T])
 
