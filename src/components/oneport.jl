@@ -15,7 +15,10 @@ busattributes(c::OnePort) = (:bus,)
 
 ## Defaults for OnePort
 cost(c::OnePort) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
-nodalbalance(c::OnePort) = (p = c[:p]; (c[:bus] => (o,t)->p[o,t],))
+function p(c::OnePort)
+    p = c[:p]
+    (o,t)->p[o,t],
+end
 
 ## Generator
 function addto!(jm::ModelView, m::EnergyModel, c::Generator)
@@ -47,11 +50,11 @@ addelement(Generator, :generators, (:G, :T=>:snapshots), joinpath(@__DIR__, "gen
 
 ## StorageUnit
 cost(c::StorageUnit) = sum(c[:marginal_cost] .* c[:p_dispatch]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
-function nodalbalance(c::StorageUnit)
+function p(c::StorageUnit)
     p_dispatch = c[:p_dispatch]
     p_store = c[:p_store]
 
-    (c[:bus] => (s,t)->p_dispatch[s,t] - p_store[s,t],)
+    (s,t)->p_dispatch[s,t] - p_store[s,t],
 end
 
 function addto!(jm::ModelView, m::EnergyModel, c::StorageUnit)
@@ -162,7 +165,10 @@ addelement(Store, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "stores.csv"
 
 ## Load
 cost(c::Load) = 0.
-nodalbalance(c::Load) = (p = c[:p_set]; (c[:bus] => (l,t)->-p[l,t],))
+function p(c::Load)
+    p = c[:p_set]
+    (l,t)->-p[l,t],
+end
 addto!(jm::JuMP.AbstractModel, m::EnergyModel, c::Load) = nothing
 
 addelement(Load, :loads, (:L,), joinpath(@__DIR__, "loads.csv"))

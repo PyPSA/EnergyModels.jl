@@ -13,17 +13,22 @@ struct Link <: ActiveBranch
 end
 
 busattributes(c::Branch) = (:bus0, :bus1)
+function p(c::Branch)
+    p = c[:p]
+    ((b,t)->p[b,t],   # :bus0
+     (b,t)->-p[b,t])  # :bus1
+end
 
 # Possible ways to have an emaggregator macro
 # @emaggregator(nodalbalance, c::Link, l, c[:bus0] => c[:p][l], c[:bus1] => -c[:p][l])
 # oder
 # nodalbalance(c::Link) = @emaggregator(c, l, c[:bus0] => c[:p][l], c[:bus1] => -c[:p][l])
 
-function nodalbalance(c::Link)
+function p(c::Link)
     p = c[:p]
     eff = c[:efficiency]
-    (c[:bus0] => (l,t)->-p[l,t],
-     c[:bus1] => (l,t)->eff[l]*p[l,t])
+    ((l,t)->-p[l,t],       # :bus0
+     (l,t)->eff[l]*p[l,t]) # :bus1
 end
 
 cost(c::Link) = sum(c[:marginal_cost] .* c[:p]) + sum(c[:capital_cost] .* (c[:p_nom] - getparam(c, :p_nom)))
@@ -171,11 +176,6 @@ end
 
 
 cost(c::PassiveBranch) = sum(c[:capital_cost] .* (c[:s_nom] .- getparam(c, :s_nom)))
-
-function nodalbalance(c::Branch)
-    p = c[:p]
-    (c[:bus0] => (b,t)->p[b,t], c[:bus1] => (b,t)->-p[b,t])
-end
 
 function addto!(jm::ModelView, m::EnergyModel, c::PassiveBranch)
     T = axis(m, :snapshots)

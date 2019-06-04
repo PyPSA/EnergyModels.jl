@@ -44,12 +44,14 @@ function addto!(jm::ModelView, m::EnergyModel, bus::Bus)
     T = axis(m, :snapshots)
     B = axis(bus)
 
+    # TODO One could also rearrange this addto function by finding the components on each bus first
     terms = []
-    for c = components(m), (buses, func) = nodalbalance(c)
-        push!(terms, (Dict(b=>findall(isequal(b), buses) for b=B), func))
+    for c in components(m), (busattr, p_func) in zip(busattributes(c), p(c))
+        buses = get(c, busattr)
+        push!(terms, (Dict(b=>findall(isequal(b), buses) for b in B), p_func))
     end
 
-    @constraint(jm, balance[b=B,t=T], sum(f(l,t) for (idx, f)=terms, l=idx[b]) == 0)
+    @constraint(jm, p_balance[b=B,t=T], sum(f(l,t) for (idx, f) in terms, l in idx[b]) == 0)
 end
 
 addelement(Bus{EnergyModel}, :buses, (:B, :T=>:snapshots), joinpath(@__DIR__, "components", "buses.csv"))
