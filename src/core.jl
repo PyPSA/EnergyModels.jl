@@ -54,11 +54,11 @@ Base.push!(m::EnergyModel, c::Component) = (m.components[c.class] = c)
 Base.push!(m::EnergyModel, c::SubNetwork) = (m.subnetworks[c.class] = c)
 Base.push!(m::EnergyModel, c::Bus) = (m.buses[c.class] = c)
 
-components(m::EnergyModel) = values(c.components)
+components(m::EnergyModel) = values(m.components)
 components(sn::SubNetwork) = components(model(sn))
 
 components(m::EnergyModel, T::Type{<:Component}) = (c for c = components(m) if isa(c, T))
-components(sn::SubNetwork, T::Type{<:Component}) = (c for c = components(m) if isa(c, T))
+components(sn::SubNetwork, T::Type{<:Component}) = (c for c = components(sn) if isa(c, T))
 
 buses(m::EnergyModel) = values(m.buses)
 subnetworks(m::EnergyModel) = values(m.subnetworks)
