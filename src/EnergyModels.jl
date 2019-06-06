@@ -2,10 +2,8 @@ __precompile__()
 
 module EnergyModels
 
-using Compat
 using Destruct
 using JuMP
-using Gurobi
 using AxisArrays
 using LightGraphs
 using MetaGraphs
