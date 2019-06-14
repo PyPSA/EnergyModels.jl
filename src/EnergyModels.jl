@@ -33,16 +33,13 @@ include("graph.jl")
 include("data.jl")
 include("containerviews.jl")
 
-include("elements.jl")
-include("components/oneport.jl")
-include("components/branch.jl")
+include("components/components.jl")
 
-export @emvariable, @emconstraint, addto!, optimize!, components, subnetworks, buses,
-    push!, axis, graph, determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual,
-    getparam
+export addto!, optimize!, devices, subnetworks, buses, push!, axis, graph,
+    determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual, getparam
 
-# Components
-export EnergyModel, SubNetwork, Component, Bus, Line, Transformer, Link,
+# Components and Devices
+export EnergyModel, SubNetwork, Device, Bus, Line, Transformer, Link,
     Load, Generator, StorageUnit, Store, Branch, PassiveBranch, ActiveBranch,
     OnePort
 

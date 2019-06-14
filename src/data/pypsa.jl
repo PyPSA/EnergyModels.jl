@@ -18,7 +18,7 @@ struct MissingPypsaAttrInfo{T} <: AbstractPypsaAttrInfo
 end
 
 struct PypsaClassInfo
-    elemtype::Symbol
+    comptype::Symbol
     class::Symbol
     names::Axis
     attrinfos::Dict{Symbol,AbstractPypsaAttrInfo}
@@ -28,7 +28,7 @@ end
 
 struct PypsaNcData <: AbstractNcData
     dataset::Dataset
-    elements::Vector{Symbol}
+    components::Vector{Symbol}
     classinfos::Dict{Symbol}{PypsaClassInfo}
 end
 
@@ -108,10 +108,10 @@ function pypsatypeparams(name, ds, listname, indices, types)
     Dict(c => typ[1, c] for c = names(typ) if c != :name)
 end
 
-function pypsaclassinfos(ds, listname, elemtypename)
+function pypsaclassinfos(ds, listname, comptypename)
     classinfos = Dict{Symbol, PypsaClassInfo}()
 
-    attrs = copy(attributes(elemtypename))
+    attrs = copy(attributes(comptypename))
     attrs = attrs[attrs[:quantitytype] .!= "Variable", :]
     attrs[:PyPSA] = string.(attrs[:attribute])
     attrs[:dimensions] = recode(length.(attrs[:dimensions]),
@@ -128,7 +128,7 @@ function pypsaclassinfos(ds, listname, elemtypename)
         attrinfos = pypsaattrinfos(attrs, name, ds, listname, indices, names)
         variables = pypsavariables(attrs, name, ds, listname, indices)
         typeparams = pypsatypeparams(name, ds, listname, indices, types)
-        classinfos[class] = PypsaClassInfo(elemtypename, class, Axis{elemtypename}(names), attrinfos, variables, typeparams)
+        classinfos[class] = PypsaClassInfo(comptypename, class, Axis{comptypename}(names), attrinfos, variables, typeparams)
     end
 
     classinfos
@@ -140,30 +140,30 @@ end
 """
 function Base.show(io::IO, data::PypsaNcData)
     println(io, string(typeof(data)), " based on '", path(data.dataset), "' describes")
-    for c = data.components[1:end]
+    for c = data.devices[1:end]
         class = (string(class, " (", length(data.classinfos[class].names), ")") for class = classes(data, c))
         println(io, "    ", naming(c), ": ", join(class, ", "))
     end
 end
 
 function PypsaNcData(ds)
-    # Check for available components by looking for size of _i coordinate
-    # For one component something like
-    pypsacomponents = CSV.read(joinpath(@__DIR__, "pypsa.components.csv"))
+    # Check for available devices by looking for size of _i coordinate
+    # For one device something like
+    pypsadevices = CSV.read(joinpath(@__DIR__, "pypsa.devices.csv"))
 
-    # Determine defined components and split them into classes
+    # Determine defined devices and split them into classes
     # Work In Progress: for now we assume that splitting on carrier is good enough
-    elements = Symbol[]
+    components = Symbol[]
     classinfos = Dict{Symbol}{PypsaClassInfo}()
-    for row = eachrow(pypsacomponents)
+    for row = eachrow(pypsadevices)
         listname = row[:listname]
         if !haskey(ds.dim, listname * "_i") || ds.dim[listname * "_i"] == 0
             continue
         end
 
-        elemtypename = Symbol(row[:componenttype])
-        push!(elements, elemtypename)
-        merge!(classinfos, pypsaclassinfos(ds, listname, elemtypename))
+        comptypename = Symbol(row[:devicetype])
+        push!(components, comptypename)
+        merge!(classinfos, pypsaclassinfos(ds, listname, comptypename))
     end
 
     # ## Below there is a try to figure out the splits based on grouping all
@@ -177,7 +177,7 @@ function PypsaNcData(ds)
     # # - generators_committable
 
     # jtype = Generator
-    # c = pypsacomponents[jtype]
+    # c = pypsadevices[jtype]
 
     # c = @NT(jtype=EM.Generator,
     #         listname="generators",
@@ -203,7 +203,7 @@ function PypsaNcData(ds)
     #         index = df[:inds])
     # end
 
-    PypsaNcData(ds, elements, classinfos)
+    PypsaNcData(ds, components, classinfos)
 end
 
 
@@ -223,18 +223,18 @@ function Base.get(data::PypsaNcData, attrinfo::PypsaAttrInfo{T}, ax) where T
               ax, (axis(data, n) for n = dims)...)
 end
 
-function Base.get(data::PypsaNcData, element::Element, param::Symbol)
-    classinfo = data.classinfos[naming(element)]
+function Base.get(data::PypsaNcData, component::Component, param::Symbol)
+    classinfo = data.classinfos[naming(component)]
     get(data, classinfo.attrinfos[param], classinfo.names)
 end
 
-gettypeparams(data::PypsaNcData, component::Component, class::Symbol) =
-    data.classinfos[naming(component)].typeparams
+gettypeparams(data::PypsaNcData, device::Device, class::Symbol) =
+    data.classinfos[naming(device)].typeparams
 
-isvar(data::PypsaNcData, element::Element, param::Symbol) =
-    in(param, data.classinfos[naming(element)].variables)
+isvar(data::PypsaNcData, component::Component, param::Symbol) =
+    in(param, data.classinfos[naming(component)].variables)
 
-axis(data::PypsaNcData, e::Element) = data.classinfos[naming(e)].names
+axis(data::PypsaNcData, e::Component) = data.classinfos[naming(e)].names
 
-modelelements(data::PypsaNcData) = resolve.(data.elements)
-classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.elemtype === naming(T))
+modelcomponents(data::PypsaNcData) = resolve.(data.components)
+classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.comptype === naming(T))

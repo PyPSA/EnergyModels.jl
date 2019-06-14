@@ -4,18 +4,18 @@
     ModelView{T,S}
 
 A wrapper around any JuMP `model` to prefix variables and constraints with
-`<element.class>::` and store them in an `element.objects`-Dictionary instead.
+`<component.class>::` and store them in an `component.objects`-Dictionary instead.
 Every other operation is just handed through to the inner `model`.
 """
 struct ModelView{T,S} <: JuMP.AbstractModel
     model::T
-    element::S
+    component::S
 end
 
-prefix(view::ModelView, name::String) = string(view.element.class, "::", name)
+prefix(view::ModelView, name::String) = string(view.component.class, "::", name)
 
 Base.broadcastable(view::ModelView) = Ref(view)
-JuMP.object_dictionary(view::ModelView) = view.element.objects
+JuMP.object_dictionary(view::ModelView) = view.component.objects
 
 JuMP.variable_type(view::ModelView) = variable_type(view.model)
 JuMP.add_variable(view::ModelView, v::JuMP.AbstractVariable, name::String="") = add_variable(view.model, v, prefix(view, name))

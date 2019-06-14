@@ -61,13 +61,13 @@ axis(data::AbstractNcData, n::String) = Axis{Symbol(n)}(disallowmissing(data.dat
 #
 # * Required methods
 #
-# Base.get(data, component, class, param)
-# returns an AxisArray of `param` from `component::class`
+# Base.get(data, device, class, param)
+# returns an AxisArray of `param` from `device::class`
 #
-# components(data)
-# returns Array{DataType} with the described components
+# devices(data)
+# returns Array{DataType} with the described devices
 #
-# classes(data, ::Type{T}) where T<:Component
+# classes(data, ::Type{T}) where T<:Device
 # returns Array{Symbol} of the described classes
 
 
@@ -75,7 +75,7 @@ struct DictData <: Data
     axes::Dict{Symbol, Axis}
     data::Dict{Symbol, AxisArray}
     variables::Dict{Symbol, Set}
-    components::Vector{Tuple{Symbol, Symbol}}
+    devices::Vector{Tuple{Symbol, Symbol}}
 end
 
 DictData(; variables=Dict{Symbol,Set}(), kwargs...) = DictData(Dict{Symbol,AxisArray}(kwargs), variables=variables)
@@ -91,18 +91,18 @@ function DictData(data::Dict{Symbol, AxisArray}; variables=Dict{Symbol,Set}())
         end
     end
 
-    components = unique((Symbol.(split(string(k), "::")[[1,2]])...,) for k = keys(data))
+    devices = unique((Symbol.(split(string(k), "::")[[1,2]])...,) for k = keys(data))
 
-    DictData(axs, data, variables, components)
+    DictData(axs, data, variables, devices)
 end
 
-components(data::DictData) = resolve.(unique(typ for (typ, class) = data.components))
+devices(data::DictData) = resolve.(unique(typ for (typ, class) = data.devices))
 classes(data::DictData, T) = classes(data, naming(Symbol, T))
-classes(data::DictData, ctype::Symbol) = (class for (typ, class) = data.components if typ == ctype)
-isvar(data::DictData, c::Component, class, quantity) = in(quantity, data.variables[naming(Symbol, c, class)])
+classes(data::DictData, ctype::Symbol) = (class for (typ, class) = data.devices if typ == ctype)
+isvar(data::DictData, c::Device, class, quantity) = in(quantity, data.variables[naming(Symbol, c, class)])
 
 axis(data::DictData, n::Symbol) = data.axes[n]
 axis(data::DictData, n::String) = axis(data, Symbol(n))
-axis(data::DictData, c::Component, class) = axis(data, naming(Symbol, c, class))
+axis(data::DictData, c::Device, class) = axis(data, naming(Symbol, c, class))
 
-Base.get(data::DictData, c::Component, class, quantity) = data.data[naming(Symbol, c, class, quantity)]
+Base.get(data::DictData, c::Device, class, quantity) = data.data[naming(Symbol, c, class, quantity)]

@@ -1,21 +1,21 @@
-const ElementType = Type{<:Element}
-struct ElementAttributes
-    elemtype::ElementType
+const ComponentType = Type{<:Component}
+struct ComponentAttributes
+    comptype::ComponentType
     attributes::DataFrame
 end
 
-const elemtypenames = Dict{ElementType,Symbol}()
-const elements = Dict{Symbol,ElementAttributes}()
+const comptypenames = Dict{ComponentType,Symbol}()
+const components = Dict{Symbol,ComponentAttributes}()
 
-resolve(elemtypename::Symbol) = elements[elemtypename].elemtype
-attributes(elemtypename::Symbol) = elements[elemtypename].attributes
+resolve(comptypename::Symbol) = components[comptypename].comptype
+attributes(comptypename::Symbol) = components[comptypename].attributes
 
-addelement(::Type{T}) where T<:Element = addelement(T, naming(T))
-addelement(::Type{T}, name::Symbol) where T<:Element = addelement(T, name, ElementAttributes(T, DataFrame()))
-addelement(::Type{T}, name::Symbol, eq::ElementAttributes) where T<:Element =
-    (elements[name] = eq; elemtypenames[T] = name)
+addcomponent(::Type{T}) where T<:Component = addcomponent(T, naming(T))
+addcomponent(::Type{T}, name::Symbol) where T<:Component = addcomponent(T, name, ComponentAttributes(T, DataFrame()))
+addcomponent(::Type{T}, name::Symbol, eq::ComponentAttributes) where T<:Component =
+    (components[name] = eq; comptypenames[T] = name)
 
-function addelement(::Type{T}, name::Symbol, axes, filename) where T<:Element
+function addcomponent(::Type{T}, name::Symbol, axes, filename) where T<:Component
     axes = (first(axes)=>name, Base.tail(axes)...)
     df = CSV.read(filename, truestrings=["t"], falsestrings=["f"])
     df[:attribute] = Symbol.(df[:attribute])
@@ -23,11 +23,11 @@ function addelement(::Type{T}, name::Symbol, axes, filename) where T<:Element
     rename_dimensions(x) = tuple(recode(Symbol.(split(x, ',')), axes...)...)
     df[:dimensions] = map(x->ismissing(x) ? () : rename_dimensions(x), df[:dimensions])
 
-    addelement(T, name, ElementAttributes(T, df))
+    addcomponent(T, name, ComponentAttributes(T, df))
 end
 
-function naming(T::ElementType)
-    haskey(elemtypenames, T) && return elemtypenames[T]
+function naming(T::ComponentType)
+    haskey(comptypenames, T) && return comptypenames[T]
     s = lowercase(string(T.name.name))
     Symbol(s, in(s[end], ('s', 'h')) ? "es" : "s")
 end
