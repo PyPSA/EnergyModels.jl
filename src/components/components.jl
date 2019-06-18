@@ -2,7 +2,7 @@
 cost(::EnergyModel, d::Device) = cost(d)
 cost(::Device) = error("Not implemented")
 
-expression(d::Device, ::ExpressionType) = error("Not implemented")
+expression(d::Device, ::Expression) = error("Not implemented")
 expression(d::Device, ::Cost) = cost(d)
 
 """

@@ -11,6 +11,11 @@ using DataFrames
 using Logging
 using SparseArrays
 
+import PowerModels
+const PM = PowerModels
+
+using Base.Iterators: flatten
+
 # using Memento
 
 # # Create our module level logger (this will get precompiled)
@@ -22,9 +27,11 @@ using SparseArrays
 #     Memento.register(logger)
 # end
 
-include("formulation.jl")
 
+include("abstracttypes.jl")
 include("core.jl")
+
+include("formulation.jl")
 include("compat.jl")
 include("macros.jl")
 include("modelview.jl")

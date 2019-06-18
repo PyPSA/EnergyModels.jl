@@ -146,6 +146,12 @@ function Base.show(io::IO, data::PypsaNcData)
         println(io, "    ", naming(c), ": ", join(class, ", "))
     end
 end
+
+function Base.show(io::IO, data::PypsaClassInfo)
+    println(io, string(typeof(data)), " based on '", path(data.dataset), "' describes")
+    for c in data.components
+        class = (string(class, " (", length(data.classinfos[class].names), ")")
+                 for class in classes(data, c))
         println(io, "    ", naming(c), ": ", join(class, ", "))
     end
 end

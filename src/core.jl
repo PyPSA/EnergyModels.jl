@@ -1,17 +1,3 @@
-using Base.Iterators: flatten
-
-abstract type Data end
-abstract type ExpressionType end
-
-abstract type Emission <: ExpressionType end
-struct Cost <: ExpressionType end
-struct CO2 <: Emission end
-
-"Can be `add`ed to a JuMP model, must have an `objects` dictionary and a `class`"
-abstract type Component end
-
-abstract type AbstractEnergyModel end
-
 "Represents a synchronuous zone. Induced by determine_subnetworks!(model)"
 struct SubNetwork{T <: AbstractEnergyModel} <: Component
     model::T
@@ -27,24 +13,27 @@ struct Bus{T <: AbstractEnergyModel} <: Component
     objects::Dict{Symbol,Any}
 end
 
-"Connected to at least one `Bus`. Additionally to `addto!` provides `p`, `cost` and `busattributes`"
-abstract type Device <: Component end
-
-mutable struct EnergyModel <: AbstractEnergyModel
+mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <: AbstractEnergyModel
     devices::Dict{Symbol,Device}
-    subnetworks::Dict{Symbol,SubNetwork{EnergyModel}}
-    buses::Dict{Symbol,Bus{EnergyModel}}
+    subnetworks::Dict{Symbol,SubNetwork{EnergyModel{MT,TF}}}
+    buses::Dict{Symbol,Bus{EnergyModel{MT,TF}}}
     data::Data
     jumpmodel::Union{JuMP.AbstractModel,Nothing}
 end
 
 
 EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
-EnergyModel(data::Data) = load(EnergyModel(Dict{Symbol,Device}(), Dict{Symbol,SubNetwork}(), Dict{Symbol,Bus}(), data, nothing))
+EnergyModel(data::Data) = load(EnergyModel{ExpansionModel,PM.DCPlosslessForm}(Dict{Symbol,Device}(), Dict{Symbol,SubNetwork}(), Dict{Symbol,Bus}(), data, nothing))
 
+# TODO which forms are picked should be determined by Data or the Components
 function load(m::EnergyModel)
     for T in modelcomponents(m.data), class in classes(m.data, T)
-        push!(m, T(m, class, Dict{Symbol}{Any}()))
+        if (T <: SubNetwork) || (T <: Bus)
+            push!(m, T(m, class, Dict{Symbol}{Any}()))
+        else
+            push!(m, T{LinearExpansionForm{LinearDispatchForm}}(m, class, Dict{Symbol}{Any}()))
+        end
+
     end
     determine_subnetworks!(m)
     m
@@ -81,9 +70,6 @@ naming(c::Component, args...) = Symbol(naming(c), flatten((:(::), a) for a=args)
 
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, d::Device) = intersect((findall(pred, d[attr]) for attr = busattributes(d))...)
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Bus) = findall(pred, axis(c).val)
-
-isvar(m::EnergyModel, c::Component, attr::Symbol) = isvar(m.data, c, attr)
-isvar(c::Component, attr::Symbol) = isvar(model(c), c, attr)
 
 function Base.getindex(m::EnergyModel, class::Symbol)
     for t = (:devices, :buses, :subnetworks)
