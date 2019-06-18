@@ -14,4 +14,4 @@ function addto!(jm::ModelView, m::EnergyModel, sn::SubNetwork)
     @constraint(jm, cycles[c=1:size(C,2),t=T], sum(Cv[j] * effimp[Cl[j]] * p[Cl[j],t] for j=nzrange(C,c)) == 0)
 end
 
-addcomponent(SubNetwork{EnergyModel}, :subnetworks)
+addcomponent(SubNetwork, :subnetworks)

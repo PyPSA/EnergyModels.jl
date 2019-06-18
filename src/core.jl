@@ -27,7 +27,7 @@ struct Bus{T <: AbstractEnergyModel} <: Component
     objects::Dict{Symbol,Any}
 end
 
-"Connected to at least one `Bus`. Additionally to `addto!` provides `p` and `cost`"
+"Connected to at least one `Bus`. Additionally to `addto!` provides `p`, `cost` and `busattributes`"
 abstract type Device <: Component end
 
 mutable struct EnergyModel <: AbstractEnergyModel

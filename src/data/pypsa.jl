@@ -140,8 +140,12 @@ end
 """
 function Base.show(io::IO, data::PypsaNcData)
     println(io, string(typeof(data)), " based on '", path(data.dataset), "' describes")
-    for c = data.devices[1:end]
-        class = (string(class, " (", length(data.classinfos[class].names), ")") for class = classes(data, c))
+    for c in data.components
+        class = (string(class, " (", length(data.classinfos[class].names), ")")
+                 for class in classes(data, c))
+        println(io, "    ", naming(c), ": ", join(class, ", "))
+    end
+end
         println(io, "    ", naming(c), ": ", join(class, ", "))
     end
 end
@@ -237,4 +241,7 @@ isvar(data::PypsaNcData, component::Component, param::Symbol) =
 axis(data::PypsaNcData, e::Component) = data.classinfos[naming(e)].names
 
 modelcomponents(data::PypsaNcData) = resolve.(data.components)
-classes(data::PypsaNcData, T) = (cl.class for cl = values(data.classinfos) if cl.comptype === naming(T))
+classes(data::PypsaNcData, comptype::Symbol) = (cl.class
+                                                for cl in values(data.classinfos)
+                                                if cl.comptype === comptype)
+classes(data::PypsaNcData, T) = classes(data, naming(T))

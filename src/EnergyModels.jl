@@ -22,6 +22,7 @@ using SparseArrays
 #     Memento.register(logger)
 # end
 
+include("formulation.jl")
 
 include("core.jl")
 include("compat.jl")

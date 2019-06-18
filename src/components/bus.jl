@@ -12,4 +12,4 @@ function addto!(jm::ModelView, m::EnergyModel, bus::Bus)
     @constraint(jm, p_balance[b=B,t=T], sum(f(l,t) for (idx, f) in terms, l in idx[b]) == 0)
 end
 
-addcomponent(Bus{EnergyModel}, :buses, (:B, :T=>:snapshots), joinpath(@__DIR__, "attrs", "buses.csv"))
+addcomponent(Bus, :buses, (:B, :T=>:snapshots), joinpath(@__DIR__, "attrs", "buses.csv"))
