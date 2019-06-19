@@ -15,7 +15,7 @@ device is added alone.
 """
 function addto! end
 
-# Wraps the AbstractModel in a ModelView to store variables and constraints in d.objects
+# Wraps the AbstractModel in a ModelView to store variables and constraints in m.objects[<class>]
 function addto!(jm::JuMP.AbstractModel, m::EnergyModel, c::Component)
     addto!(ModelView(jm, c), m, c)
 end
@@ -27,7 +27,7 @@ include("bus.jl")
 ## OnePort
 
 "Connected to exactly one `Bus`, determined by :bus attribute"
-abstract type OnePort <: Device end
+abstract type OnePort{DF<:DeviceFormulation} <: Device{DF} end
 busattributes(d::OnePort) = (:bus,)
 
 ## Defaults for OnePort
@@ -44,10 +44,10 @@ include("load.jl")
 
 # Branch
 "Connected to exactly two `Bus`es, determined by :bus0 and :bus1 attribute"
-abstract type Branch <: Device end
+abstract type Branch{DF<:DeviceFormulation} <: Device{DF} end
 
 # ActiveBranch
-abstract type ActiveBranch <: Branch end
+abstract type ActiveBranch{DF<:DeviceFormulation} <: Branch{DF} end
 
 busattributes(d::Branch) = (:bus0, :bus1)
 function p(d::Branch)

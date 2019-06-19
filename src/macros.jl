@@ -9,8 +9,9 @@ end
 
 macro adddevice(type, abstype, name, axes, file)
     type = esc(type)
+    abstype = esc(abstype)
     quote
-        struct $type{DF<:DeviceFormulation} <: $(esc(abstype))
+        struct $type{DF<:DeviceFormulation} <: $abstype{DF}
             model::EnergyModel
             class::Symbol
             objects::Dict{Symbol,Any}

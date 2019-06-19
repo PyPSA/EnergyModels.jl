@@ -8,10 +8,10 @@ abstract type Expression end
 "Can be `add`ed to a JuMP model, must have an `objects` dictionary and a `class`"
 abstract type Component end
 
-"Connected to at least one `Bus`. Additionally to `addto!` provides `p`, `cost` and `busattributes`"
-abstract type Device <: Component end
-
 abstract type DeviceFormulation end
+
+"Connected to at least one `Bus`. Additionally to `addto!` provides `p`, `cost` and `busattributes`"
+abstract type Device{DF<:DeviceFormulation} <: Component end
 
 abstract type ModelType end
 

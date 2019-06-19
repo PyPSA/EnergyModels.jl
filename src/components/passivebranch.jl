@@ -1,5 +1,5 @@
 # PassiveBranch
-abstract type PassiveBranch <: Branch end
+abstract type PassiveBranch{DF<:DeviceFormulation} <: Branch{DF} end
 
 cost(d::PassiveBranch) = sum(d[:capital_cost] .* (AxisArray(d[:s_nom]) .- getparam(d, :s_nom)))
 
