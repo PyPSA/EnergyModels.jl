@@ -19,6 +19,9 @@ function addto! end
 function addto!(jm::JuMP.AbstractModel, m::EnergyModel, c::Component)
     addto!(ModelView(jm, c), m, c)
 end
+function addto!(jm::JuMP.AbstractModel, m::EnergyModel, d::Device)
+    addto!(ModelView(jm, d), m, demote_formulation(m, d))
+end
 
 include("energymodel.jl")
 include("subnetwork.jl")
