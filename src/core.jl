@@ -3,14 +3,12 @@ struct SubNetwork{T <: AbstractEnergyModel} <: Component
     model::T
     class::Symbol
     buses::Axis
-    objects::Dict{Symbol,Any}
 end
 
 "Connection points at which energy balance is upheld, has `axis` and `addto!`"
 struct Bus{T <: AbstractEnergyModel} <: Component
     model::T
     class::Symbol
-    objects::Dict{Symbol,Any}
 end
 
 mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <: AbstractEnergyModel
@@ -19,19 +17,20 @@ mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <
     buses::Dict{Symbol,Bus{EnergyModel{MT,TF}}}
     data::Data
     jumpmodel::Union{JuMP.AbstractModel,Nothing}
+    jumpobjects::Dict{Symbol,Dict{Symbol}{Any}}
 end
 
 
 EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
-EnergyModel(data::Data) = load(EnergyModel{ExpansionModel,PM.DCPlosslessForm}(Dict{Symbol,Device}(), Dict{Symbol,SubNetwork}(), Dict{Symbol,Bus}(), data, nothing))
+EnergyModel(data::Data) = load(EnergyModel{ExpansionModel,PM.DCPlosslessForm}(Dict{Symbol,Device}(), Dict{Symbol,SubNetwork}(), Dict{Symbol,Bus}(), data, nothing, Dict{Symbol, Dict{Symbol}{Any}}()))
 
 # TODO which forms are picked should be determined by Data or the Components
 function load(m::EnergyModel)
     for T in modelcomponents(m.data), class in classes(m.data, T)
         if (T <: SubNetwork) || (T <: Bus)
-            push!(m, T(m, class, Dict{Symbol}{Any}()))
+            push!(m, T(m, class))
         else
-            push!(m, T{LinearExpansionForm{LinearDispatchForm}}(m, class, Dict{Symbol}{Any}()))
+            push!(m, T{LinearExpansionForm{LinearDispatchForm}}(m, class))
         end
 
     end
@@ -120,7 +119,7 @@ Base.get(c::Component, attr::Symbol, axes...) = WrappedArray(get(c, attr), axes.
 
 Base.getindex(c::Component, attr::Symbol) = get(c, attr)
 
-getjump(c::Component, attr::Symbol) = get(c.objects, attr, nothing)
+getjump(c::Component, attr::Symbol) = get(get!(model(c).jumpobjects, c.class, Dict{Symbol}{Any}()), attr, nothing)
 JuMP.getvalue(c::Component, attr::Symbol) = getvalue.(getjump(c, attr))
 JuMP.getdual(c::Component, attr::Symbol) = getdual.(getjump(c, attr))
 getparam(c::Component, attr::Symbol) = get(model(c).data, c, attr)
