@@ -1,6 +1,6 @@
 function addto!(jm::ModelView, m::EnergyModel, bus::Bus)
     T = axis(m, :snapshots)
-    B = axis(bus)
+    B = axis(m, bus)
 
     # TODO One could also rearrange this addto function by finding the devices on each bus first
     terms = []
