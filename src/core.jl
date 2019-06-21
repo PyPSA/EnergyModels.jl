@@ -16,13 +16,32 @@ mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <
     subnetworks::Dict{Symbol,SubNetwork{EnergyModel{MT,TF}}}
     buses::Dict{Symbol,Bus{EnergyModel{MT,TF}}}
     data::Data
+    parent::Union{AbstractEnergyModel,Nothing}
     jumpmodel::Union{JuMP.AbstractModel,Nothing}
     jumpobjects::Dict{Symbol,Dict{Symbol}{Any}}
 end
 
+ensure_optimizerfactory(opt::JuMP.OptimizerFactory) = opt
+ensure_optimizerfactory(::Type{T}) where T <: MOI.AbstractOptimizer = with_optimizer(T)
+
+function EnergyModel(::Type{MT}, ::Type{TF}, data::Data; parent=nothing, jumpmodel=nothing, optimizer=nothing) where
+      {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
+
+    if isnothing(jumpmodel) && !isnothing(optimizer)
+        jumpmodel = JuMP.Model(ensure_optimizerfactory(optimizer))
+    end
+
+    EnergyModel{MT,TF}(Dict{Symbol,Device}(),
+                       Dict{Symbol,SubNetwork}(),
+                       Dict{Symbol,Bus}(),
+                       data,
+                       parent,
+                       jumpmodel,
+                       Dict{Symbol, Dict{Symbol}{Any}}())
+end
 
 EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
-EnergyModel(data::Data) = load(EnergyModel{ExpansionModel,PM.DCPlosslessForm}(Dict{Symbol,Device}(), Dict{Symbol,SubNetwork}(), Dict{Symbol,Bus}(), data, nothing, Dict{Symbol, Dict{Symbol}{Any}}()))
+EnergyModel(data::Data; kwargs...) = load(EnergyModel(ExpansionModel, PM.DCPlosslessForm, data; kwargs...))
 
 # TODO which forms are picked should be determined by Data or the Components
 function load(m::EnergyModel)
@@ -119,7 +138,11 @@ Base.get(c::Component, attr::Symbol, axes...) = WrappedArray(get(c, attr), axes.
 
 Base.getindex(c::Component, attr::Symbol) = get(c, attr)
 
-getjump(c::Component, attr::Symbol) = get(get!(model(c).jumpobjects, c.class, Dict{Symbol}{Any}()), attr, nothing)
+function getjump(m::EnergyModel, class::Symbol, attr::Symbol)
+    ret = get(get!(m.jumpobjects, class, Dict{Symbol}{Any}()), attr, nothing)
+    (!isnothing(ret) || isnothing(m.parent)) ? ret : getjump(m.parent, class, attr)
+end
+getjump(c::Component, attr::Symbol) = getjump(model(c), c.class, attr)
 JuMP.getvalue(c::Component, attr::Symbol) = getvalue.(getjump(c, attr))
 JuMP.getdual(c::Component, attr::Symbol) = getdual.(getjump(c, attr))
 getparam(c::Component, attr::Symbol) = get(model(c).data, c, attr)

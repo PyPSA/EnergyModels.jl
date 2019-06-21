@@ -14,6 +14,9 @@ using SparseArrays
 import PowerModels
 const PM = PowerModels
 
+import MathOptInterface
+const MOI = MathOptInterface
+
 using Base.Iterators: flatten
 
 # using Memento
@@ -43,8 +46,9 @@ include("containerviews.jl")
 
 include("components/components.jl")
 
-export addto!, optimize!, devices, subnetworks, buses, push!, axis, graph,
-    determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual, getparam
+export addto!, build!, optimize!, devices, subnetworks, buses, push!, axis,
+    graph, determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual,
+    getparam
 
 # Components and Devices
 export EnergyModel, SubNetwork, Device, Bus, Line, Transformer, Link,
