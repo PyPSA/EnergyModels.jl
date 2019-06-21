@@ -8,34 +8,6 @@ struct NcData <: Data
     dataset::Dataset
 end
 
-# struct QAxis
-#     name::Symbol
-#     length::Int32
-# end
-
-# Later we should represent variants more by something like this
-#
-# struct Quantity
-#     name::Symbol
-#     isvariable::Bool
-#     dimensions::Tuple{Vararg{Symbol}}
-#     Quantity(name, isvariable, dimensions) = new(name, isvariable, tuple(sort!(collect(dimensions))...))
-# end
-#
-# const Variant = NTuple{N,Quantity} where N
-# Variant(quantities::Vararg{Quantity}) = Variant(sort!(collect(quantities)))
-# Base.isless(a::Quantity, b::Quantity) = a.isvariable != b.isvariable ? a.isvariable < b.isvariable : a.name < b.name
-# Base.show(io::IO, v::Variant) = for q=v print(io, "::"); show(io, q) end
-# Base.show(io::IO, q::Quantity) = print(io, string(q.name, q.isvariable ? "_v" : "", "_", join(string.(q.dimensions), ":")))
-
-# or even type based as a variant of
-
-# struct QAxis{name,N} end
-
-# struct Quantity{name,isvar,N,Ax}
-#     Quantity{name,isvar,N,Ax}() where {name,isvar<:Bool,N,Ax<:Tuple{Vararg{QAxis,N}}} = new{name,isvar,N,Ax}()
-# end
-
 function NcData(filename::String)
     ds = Dataset(filename)
     (haskey(ds.attrib, "network_pypsa_version") ? PypsaNcData : NcData)(ds)
@@ -61,8 +33,8 @@ axis(data::AbstractNcData, n::String) = Axis{Symbol(n)}(disallowmissing(data.dat
 #
 # * Required methods
 #
-# Base.get(data, device, class, param)
-# returns an AxisArray of `param` from `device::class`
+# Base.get(data, class, param)
+# returns an AxisArray of `param` from `class`
 #
 # devices(data)
 # returns Array{DataType} with the described devices
@@ -71,9 +43,10 @@ axis(data::AbstractNcData, n::String) = Axis{Symbol(n)}(disallowmissing(data.dat
 # returns Array{Symbol} of the described classes
 
 
-struct DictData <: Data
+struct DictData{T} <: Data
     axes::Dict{Symbol, Axis}
-    data::Dict{Symbol, AxisArray}
+    data::Dict{Symbol, Dict{Symbol,AxisArray}}
+    fallback::T
     variables::Dict{Symbol, Set}
     devices::Vector{Tuple{Symbol, Symbol}}
 end
@@ -101,8 +74,20 @@ classes(data::DictData, T) = classes(data, naming(Symbol, T))
 classes(data::DictData, ctype::Symbol) = (class for (typ, class) = data.devices if typ == ctype)
 isvar(data::DictData, c::Device, class, quantity) = in(quantity, data.variables[naming(Symbol, c, class)])
 
-axis(data::DictData, n::Symbol) = data.axes[n]
-axis(data::DictData, n::String) = axis(data, Symbol(n))
-axis(data::DictData, c::Device, class) = axis(data, naming(Symbol, c, class))
+function axis(data::DictData{<:Data}, n::Symbol)
+    ret = get(data.axes, n, nothing)
+    !isnothing(ret) ? ret : get(data.fallback, n)
+end
+axis(data::DictData{Nothing}, n::Symbol) = data.axes[n]
+axis(data::DictData, c::Device) = axis(data, c.class)
 
-Base.get(data::DictData, c::Device, class, quantity) = data.data[naming(Symbol, c, class, quantity)]
+Base.get(data::DictData{Nothing}, c::Component, quantity) = data.data[c.class][quantity]
+function Base.get(data::DictData{<:Data}, c::Component, quantity)
+    devicedict = get(data.data, c.class, nothing)
+    if !isnothing(devicedict)
+        ret = get(devicedict, quantity, nothing)
+        !isnothing(ret) ? ret : get(data.fallback, c, quantity)
+    else
+        get(data.fallback, c, quantity)
+    end
+end
