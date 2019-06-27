@@ -1,38 +1,165 @@
+module PyPSAData
+
+using AxisArrays
+using NCDatasets
 using DataFrames
 using CSV
 
-abstract type AbstractPypsaAttrInfo end
+using ..EnergyModels
+const EM = EnergyModels
 
-struct PypsaAttrInfo{T} <: AbstractPypsaAttrInfo
+using ..EnergyModels:
+    AbstractNcData, resolve, @consense, Component, Device, DeviceFormulation,
+    attributes, components, typenames, naming
+
+export PypsaNcData
+
+abstract type AbstractAttrDesc end
+
+struct AttrDesc{T} <: AbstractAttrDesc
     pypsaname::String
     indices::Union{Colon,UnitRange{Int64},StepRange{Int64,Int64},Vector{Int64}}
     default::Union{T,Missing}
 end
 
-struct SinglePypsaAttrInfo{T} <: AbstractPypsaAttrInfo
+struct SingleAttrDesc{T} <: AbstractAttrDesc
     value::T
 end
 
-struct MissingPypsaAttrInfo{T} <: AbstractPypsaAttrInfo
+struct MissingAttrDesc{T} <: AbstractAttrDesc
     default::T
 end
 
-struct PypsaClassInfo
-    comptype::Symbol
-    class::Symbol
-    names::Axis
-    attrinfos::Dict{Symbol,AbstractPypsaAttrInfo}
-    variables::Set{Symbol}
+struct ComponentDesc
+    name::Symbol
+    axis::Axis
+    componenttype
+    attributes::Dict{Symbol,AbstractAttrDesc}
     typeparams::Union{Nothing,Dict{Symbol,Any}}
+end
+
+"""
+    _dimnames(::PypsaNcData, ::AbstractAttrDesc)
+
+returns tuples for the dimensions EXCEPT for the main component axis.
+"""
+_dimnames(attrdesc::AbstractAttrDesc; ds=nothing) = ()
+_dimnames(attrdesc::AttrDesc; ds=nothing) = dimnames(ds[attrdesc.pypsaname])[2:end]
+
+function AxisArrays.axes(cd::ComponentDesc; ds=nothing)
+    dims = unique(Iterators.flatten((_dimnames(attrdesc; ds=ds) for attrdesc in values(cd.attributes))))
+    (cd.axis, (Axis{Symbol(n)}(nomissing(ds[n][:])) for n = dims)...)
 end
 
 struct PypsaNcData <: AbstractNcData
     dataset::Dataset
-    components::Vector{Symbol}
-    classinfos::Dict{Symbol}{PypsaClassInfo}
+    components::Dict{Symbol}{ComponentDesc}
+    axes::Dict{Symbol}{Axis}
 end
 
-function maybe_as_range(x::AbstractArray{T,1}) where T<:Number
+_getattr(ds, pypsaname, attr) =
+    haskey(ds, attr) ? nomissing(ds[attr][:]) : Array{Union{Float64,Missing}}(missing, length(ds[string(pypsaname, "_i")]))
+
+_getattrpair(ds, pypsaname, attr) = attr => _getattr(ds, pypsaname, string(pypsaname, "_", attr))
+_getattrpair(ds, pypsaname, attr::Pair) = _getattrpair(ds, pypsaname, attr.first)
+_getattrpair(ds, pypsaname, attr::DataFrame) = ((col,)=names(df); col=>attr[col])
+
+splitgroup(df, group) = [group]
+splitgroup(df, group, pair::Pair, attrs...) = splitgroup(df, group, pair.first, attrs...; usename=x->pair.second[x ? 1 : 2])
+function splitgroup(df, group, attr, attrs...; usename=identity)
+    gdf = groupby(DataFrame(attr=>df[attr][group.idx], :idx=>group.idx, copycols=false), attr);
+
+    if length(gdf) == 1
+        ng = attr == :carrier ? (idx=group.idx, name=(group.name..., usename(first(parent(gdf)[attr])))) : group
+        groups = splitgroup(df, ng, attrs...)
+    else
+        groups = Any[]
+        for sdf in gdf
+            ng = (idx=collect(sdf.idx),
+                  name=(group.name..., usename(first(sdf[attr]))))
+            append!(groups, splitgroup(df, ng, attrs...))
+        end
+    end
+
+    groups
+end
+
+function splitintogroups(ds, pypsaname, attrs...; initialname=())
+    df = DataFrame((_getattrpair(ds, pypsaname, attr) for attr in attrs)...,
+                   copycols=false)
+    if isempty(df)
+        [(idx=1:size(ds[string(pypsaname, "_i")], 1),
+          name=Symbol(join(skipmissing(initialname), "_")),
+          attrs=Dict{Symbol}{Any}())]
+    else
+        [(idx=_maybe_as_range(group.idx),
+          name=Symbol(join(skipmissing(group.name), "_")),
+          attrs=Dict(pairs(df[first(group.idx),:])...))
+         for group in splitgroup(df, (idx=1:size(df, 1), name=initialname), attrs...)]
+    end
+end
+
+AttrDesc(::Type{Val{:single}}, attr, name, ds, attrname, attrname_t, idx, axis) =
+    SingleAttrDesc(convert(Union{typenames[attr[:dtype]],Missing}, haskey(ds, attrname) ?
+        @consense(ds[attrname][:][idx], "$name must be a single value") : attr[:default]))
+
+AttrDesc(::Type{Val{:static}}, attr, name, ds, attrname, attrname_t, idx, axis) =
+    haskey(ds, attrname) ?
+    AttrDesc{typenames[attr[:dtype]]}(attrname, idx, attr[:default]) :
+    MissingAttrDesc(attr[:default])
+
+function AttrDesc(::Type{Val{:series}}, attr, name, ds, attrname, attrname_t, idx, axis)
+    attrname_t_i = attrname_t * "_i"
+    indices_t = haskey(ds, attrname_t_i) ? findall(in(ds[attrname_t_i][:]), axis) : []
+    if length(indices_t) == 0
+        AttrDesc(Val{:static}, attr, name, ds, attrname, attrname_t, idx, axis)
+    else
+        @assert(length(indices_t) == length(axis),
+                "$name has static and time-dependent $(attr[:PyPSA])")
+        AttrDesc(attrname_t, indices_t, attr[:default])
+    end
+end
+
+AttrDesc(attr, name, ds, pypsaname, idx, axis) =
+    AttrDesc(Val{attr[:dimensions]}, attr, name, ds,
+             string(pypsaname, "_", attr[:PyPSA]),
+             string(pypsaname, "_t_", attr[:PyPSA]),
+             idx, axis)
+
+attributedescriptions(args...; attributes=nothing) =
+    Dict(attr[:attribute]=>AttrDesc(attr, args...) for attr = eachrow(attributes))
+
+function typeparamdescriptions(name, ds, listname, indices; types=nothing)
+    typefield = string(listname, "_type")
+    if types === nothing || !haskey(ds, typefield) return nothing end
+    typename = @consense(ds[typefield][:][indices], "$name may not have more than one type")
+    typ = types[types[:name] .== typename, :]
+    Dict(c => typ[1, c] for c = names(typ) if c != :name)
+end
+
+"""
+    PypsaNcData
+
+"""
+function PypsaNcData(ds)
+    # Determine defined components and split them into classes
+    components = vcat(
+        getcomponents(ds, :buses),
+        getcomponents(ds, :generators, withname=false, exp=:p_nom_extendable, uc=:committable),
+        getcomponents(ds, :storageunits, withname=false, pypsaname="storage_units", exp=:p_nom_extendable),
+        getcomponents(ds, :stores, carrier=:bus, exp=:e_nom_extendable),
+        getcomponents(ds, :loads, carrier=:bus),
+        getcomponents(ds, :links, carrier=(:bus0, :bus1), exp=:p_nom_extendable),
+        getcomponents(ds, :lines, carrier=:bus0, exp=:s_nom_extendable),
+        getcomponents(ds, :transformers, carrier=:bus0, exp=:s_nom_extendable)
+    )
+
+    compdict = Dict(cd.name => cd for cd in components)
+    axdict = EM.collectaxes(components; ds=ds)
+    PypsaNcData(ds, compdict, axdict)
+end
+
+function _maybe_as_range(x::AbstractArray{T,1}) where T<:Number
     if length(x) < 3 return Vector(x) end
     d = diff(x)
     s = d[1]
@@ -43,211 +170,112 @@ function maybe_as_range(x::AbstractArray{T,1}) where T<:Number
     end
 end
 
-function splitbyattr(ds, listname, attrs)
-    i = 1
-    while i <= length(attrs) && !haskey(ds, attrs[i])
-        i+=1
-    end
-    if i > length(attrs)
-        return Dict(Symbol(listname)=>Colon())
-    end
-    da = ds[attrs[i]]
-    df = DataFrame(indices=1:length(da), class=da[:])
-    Dict(Symbol(g[1, :class]) => maybe_as_range(g[:indices])
-         for g = groupby(df, :class))
+_join(a...; delim="_") = join(a, delim)
+getcarrier(ds, buses_carrier, pypsaname, busattr) =
+    getindex.(buses_carrier, nomissing(ds[string(pypsaname, "_", busattr)]))
+getcarrier(ds, buses_carrier, pypsaname, busattrs::Tuple) =
+    _join.((getcarrier(ds, buses_carrier, pypsaname, busattr) for busattr in busattrs)...)
+function getcarrier(ds, pypsaname, busattrs)
+    buses_carrier = Dict(nomissing(ds["buses_i"][:]) .=> nomissing(ds["buses_carrier"][:]))
+    DataFrame(carrier=getcarrier(ds, buses_carrier, pypsaname, busattrs))
 end
 
-PypsaAttrInfo(::Type{Val{:single}}, attr, name, ds, attrname, _, indices, names) =
-    SinglePypsaAttrInfo(convert(Union{typenames[attr[:dtype]],Missing}, haskey(ds, attrname) ?
-        @consense(ds[attrname][:][indices], "$name must be a single value") : attr[:default]))
+_length(carrier) = 1
+_length(carrier::Tuple) = length(carrier)
 
-PypsaAttrInfo(::Type{Val{:static}}, attr, name, ds, attrname, _, indices, names) =
-    haskey(ds, attrname) ?
-    PypsaAttrInfo{typenames[attr[:dtype]]}(attrname, indices, attr[:default]) :
-    MissingPypsaAttrInfo(attr[:default])
-
-function PypsaAttrInfo(::Type{Val{:series}}, attr, name, ds, attrname, attrname_t, indices, names)
-    attrname_t_i = attrname_t * "_i"
-    indices_t = haskey(ds, attrname_t_i) ? findall(in(ds[attrname_t_i][:]), names) : []
-    if length(indices_t) == 0
-        PypsaAttrInfo(Val{:static}, attr, name, ds, attrname, attrname_t, indices, names)
-    else
-        @assert(length(indices_t) == length(names),
-                "$name has static and time-dependent $(attr[:PyPSA])")
-        PypsaAttrInfo(attrname_t, indices_t, attr[:default])
+function getcomponents(ds, name; pypsaname=false, withname=true, carrier=true, exp=false, uc=false)
+    if pypsaname === false
+        pypsaname = string(name)
     end
-end
 
-PypsaAttrInfo(attr, name, ds, listname, indices, names) =
-    PypsaAttrInfo(Val{attr[:dimensions]}, attr, name, ds,
-                  string(listname, "_", attr[:PyPSA]),
-                  string(listname, "_t_", attr[:PyPSA]),
-                  indices, names)
+    components = ComponentDesc[]
 
-pypsaattrinfos(attrs, args...) = Dict(attr[:attribute]=>PypsaAttrInfo(attr, args...)
-                                      for attr = eachrow(attrs))
+    if !haskey(ds.dim, pypsaname * "_i") || ds.dim[pypsaname * "_i"] == 0
+        return components
+    end
 
-function pypsavariables(attrs, name, ds, listname, indices)
-    variables = Set{Symbol}()
-    for attr = eachrow(attrs[attrs[:quantitytype] .== "VarParam", :])
-        switchname = string(listname, "_", attr[:PyPSA], "_extendable")
-        if haskey(ds, switchname) &&
-            @consense(ds[switchname][:][indices],
-                      "$(attr[:variable_switch]) of $name must either be true or false") == 1
-            push!(variables, attr[:attribute])
+    initialname = withname ? (name,) : ()
+
+    attrs = []
+    if carrier === true
+        push!(attrs, :carrier)
+    elseif carrier !== false
+        if "buses_carrier" in ds
+            push!(attrs, getcarrier(ds, carrier))
+        else
+            initialname = (initialname..., join(repeat(["AC"], _length(carrier)), "_"))
         end
     end
-    variables
-end
 
-function pypsatypeparams(name, ds, listname, indices, types)
-    typefield = string(listname, "_type")
-    if types === nothing || !haskey(ds, typefield) return nothing end
-    typename = @consense(ds[typefield][:][indices], "$name may not have more than one type")
-    typ = types[types[:name] .== typename, :]
-    Dict(c => typ[1, c] for c = names(typ) if c != :name)
-end
+    if exp !== false push!(attrs, exp => (:ext, :fix)) end
+    if uc !== false push!(attrs, uc => (:uc, :lin)) end
 
-function pypsaclassinfos(ds, listname, comptypename)
-    classinfos = Dict{Symbol, PypsaClassInfo}()
-
-    attrs = copy(attributes(comptypename))
-    attrs = attrs[attrs[:quantitytype] .!= "Variable", :]
-    attrs[:PyPSA] = string.(attrs[:attribute])
-    attrs[:dimensions] = recode(length.(attrs[:dimensions]),
-                                0=>:single, 1=>:static, 2=>:series,
-                                3:20=>missing)
-
-    # TODO types should be refactored into parametertables to be able to represent carriers as well
-    typesfn = joinpath(@__DIR__, string("pypsa.", listname, ".types.csv"))
+    typesfn = joinpath(@__DIR__, string("pypsa.", pypsaname, ".types.csv"))
     types = isfile(typesfn) ? CSV.read(typesfn) : nothing
 
-    for (class, indices) = splitbyattr(ds, listname, string.(listname, "_", ("class", "carrier")))
-        names = disallowmissing(ds[listname * "_i"][:][indices])
-        name = string(listname, "::", class)
-        attrinfos = pypsaattrinfos(attrs, name, ds, listname, indices, names)
-        variables = pypsavariables(attrs, name, ds, listname, indices)
-        typeparams = pypsatypeparams(name, ds, listname, indices, types)
-        classinfos[class] = PypsaClassInfo(comptypename, class, Axis{comptypename}(names), attrinfos, variables, typeparams)
+    componenttypeunion = resolve(Component, name)
+    componentattributes = copy(attributes(componenttypeunion))
+    componentattributes = componentattributes[componentattributes[:quantitytype] .!= "Variable", :]
+    componentattributes[:PyPSA] = string.(componentattributes[:attribute])
+    componentattributes[:dimensions] = recode(length.(componentattributes[:dimensions]),
+                                              0=>:single, 1=>:static, 2=>:series,
+                                              3:20=>missing)
+
+    for g in splitintogroups(ds, pypsaname, attrs...; initialname=initialname)
+        axis = Axis{g.name}(nomissing(ds[pypsaname * "_i"][:][g.idx]))
+
+        formulation = join(skipmissing([
+            exp !== false ? (Bool(coalesce(g.attrs[exp], false)) ? "linexp" : missing) : missing,
+            uc !== false ?  (Bool(coalesce(g.attrs[uc], false))  ? "ucdisp" : "lindisp") : "lindisp"
+        ]), "_")
+
+        componenttype =
+            if componenttypeunion <: Device
+                formulation = isempty(formulation) ? DeviceFormulation : resolve(DeviceFormulation, Symbol(formulation))
+                componenttypeunion{formulation}
+            else
+                componenttypeunion
+            end
+
+        attributes = attributedescriptions(g.name, ds, pypsaname, g.idx, axis; attributes=componentattributes)
+        typeparams = typeparamdescriptions(g.name, ds, pypsaname, g.idx; types=types)
+
+        push!(components, ComponentDesc(g.name, axis, componenttype, attributes, typeparams))
     end
 
-    classinfos
-end
-
-"""
-    PypsaNcData
-
-"""
-function Base.show(io::IO, data::PypsaNcData)
-    println(io, string(typeof(data)), " based on '", path(data.dataset), "' describes")
-    for c in data.components
-        class = (string(class, " (", length(data.classinfos[class].names), ")")
-                 for class in classes(data, c))
-        println(io, "    ", naming(c), ": ", join(class, ", "))
-    end
-end
-
-function Base.show(io::IO, data::PypsaClassInfo)
-    println(io, string(typeof(data)), " based on '", path(data.dataset), "' describes")
-    for c in data.components
-        class = (string(class, " (", length(data.classinfos[class].names), ")")
-                 for class in classes(data, c))
-        println(io, "    ", naming(c), ": ", join(class, ", "))
-    end
-end
-
-function PypsaNcData(ds)
-    # Check for available devices by looking for size of _i coordinate
-    # For one device something like
-    pypsadevices = CSV.read(joinpath(@__DIR__, "pypsa.devices.csv"))
-
-    # Determine defined devices and split them into classes
-    # Work In Progress: for now we assume that splitting on carrier is good enough
-    components = Symbol[]
-    classinfos = Dict{Symbol}{PypsaClassInfo}()
-    for row = eachrow(pypsadevices)
-        listname = row[:listname]
-        if !haskey(ds.dim, listname * "_i") || ds.dim[listname * "_i"] == 0
-            continue
-        end
-
-        comptypename = Symbol(row[:devicetype])
-        push!(components, comptypename)
-        merge!(classinfos, pypsaclassinfos(ds, listname, comptypename))
-    end
-
-    # ## Below there is a try to figure out the splits based on grouping all
-    # ## information that could change
-
-    # # Classes should split on carrier and variants as defined (fex for generators) by:
-    # # - generators_i
-    # # - generators_p_nom_extendable
-    # # - generators_t_p_max_pu_i
-    # # - generators_t_p_min_pu_i
-    # # - generators_committable
-
-    # jtype = Generator
-    # c = pypsadevices[jtype]
-
-    # c = @NT(jtype=EM.Generator,
-    #         listname="generators",
-    #         variantattrs=[:p_nom_extendable, :committable],
-    #         timedepattrs=[:p_max_pu, :p_min_pu, :marginal_cost])
-
-    # # Build feature dataframe
-    # df = DataFrame(name=as_data(ds[string(c.listname, "_i")]))
-    # df[:inds] = 1:length(df)
-    # for attr = c.variantattrs
-    #     key = string(c.listname, "_", attr)
-    #     if haskey(ds, key) df[attr] = as_data(ds[key], Vector{Bool}) end
-    # end
-    # for attr = c.timedepattrs
-    #     key = string(c.listname, "_t_", attr, "_i")
-    #     if haskey(ds, key)
-    #         df[attr] = false
-    #         df[attr][findall(in(df[:name]), as_data(ds[key]))] = true
-    #     end
-    # end
-    # map(groupby(df, df.colindex.colnames[2:end])) do x
-    #     @NT(variant = squeeze(convert(Array{Bool}{2}, df[1,2:end]), 1),
-    #         index = df[:inds])
-    # end
-
-    PypsaNcData(ds, components, classinfos)
+    components
 end
 
 
-Base.get(::PypsaNcData, attrinfo::SinglePypsaAttrInfo, _) = attrinfo.value
-Base.get(::PypsaNcData, attrinfo::MissingPypsaAttrInfo, ax) = AxisArray(fill(attrinfo.default, length(ax)), ax)
+Base.get(::PypsaNcData, attrdesc::SingleAttrDesc, _) = attrdesc.value
+Base.get(::PypsaNcData, attrdesc::MissingAttrDesc, ax) = AxisArray(fill(attrdesc.default, length(ax)), ax)
 
-function Base.get(data::PypsaNcData, attrinfo::PypsaAttrInfo{T}, ax) where T
-    da = data.dataset[attrinfo.pypsaname]
-    dims = dimnames(da)[2:end]
+function Base.get(data::PypsaNcData, attrdesc::AttrDesc{T}, ax) where T
+    da = data.dataset[attrdesc.pypsaname]
+    dims = Symbol.(dimnames(da)[2:end])
 
     as_dtype(T, a) = convert(Array{T,ndims(a)}, a)
 
     # Benchmarking shows that getting the full array first and then
     # subsetting is faster even if we need to get only 1 or 2 lines
     # We would need to improve NCDatasets first!
-    AxisArray(as_dtype(T, da[:][attrinfo.indices,ntuple(i->:,length(dims))...]),
+    AxisArray(as_dtype(T, da[:][attrdesc.indices,ntuple(i->:,length(dims))...]),
               ax, (axis(data, n) for n = dims)...)
 end
 
 function Base.get(data::PypsaNcData, component::Component, param::Symbol)
-    classinfo = data.classinfos[naming(component)]
-    get(data, classinfo.attrinfos[param], classinfo.names)
+    componentdesc = data.components[naming(component)]
+    get(data, componentdesc.attributes[param], componentdesc.axis)
 end
 
-gettypeparams(data::PypsaNcData, device::Device, class::Symbol) =
-    data.classinfos[naming(device)].typeparams
+EM.gettypeparams(data::PypsaNcData, device::Device) =
+    data.components[naming(device)].typeparams
 
-isvar(data::PypsaNcData, component::Component, param::Symbol) =
-    in(param, data.classinfos[naming(component)].variables)
+EM.axis(data::PypsaNcData, e::Component) = data.axes[naming(e)]
+EM.axis(data::PypsaNcData, name::Symbol) = data.axes[name]
 
-axis(data::PypsaNcData, e::Component) = data.classinfos[naming(e)].names
+EM.components(data::PypsaNcData) = EM._components(data)
 
-modelcomponents(data::PypsaNcData) = resolve.(data.components)
-classes(data::PypsaNcData, comptype::Symbol) = (cl.class
-                                                for cl in values(data.classinfos)
-                                                if cl.comptype === comptype)
-classes(data::PypsaNcData, T) = classes(data, naming(T))
+end
+
+using .PyPSAData

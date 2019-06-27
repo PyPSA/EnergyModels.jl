@@ -2,6 +2,7 @@ __precompile__()
 
 module EnergyModels
 
+using CSV
 using Destruct
 using JuMP
 using AxisArrays
