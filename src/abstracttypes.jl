@@ -1,6 +1,6 @@
 abstract type AbstractEnergyModel end
 
-abstract type Data end
+abstract type AbstractData end
 
 abstract type Expression end
 
