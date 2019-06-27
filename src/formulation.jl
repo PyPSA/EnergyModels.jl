@@ -2,6 +2,7 @@
 
 # Dispatch formulations
 abstract type DispatchForm <: DeviceFormulation end
+
 struct LinearDispatchForm <: DispatchForm end
 struct UnitCommittmentForm <: DispatchForm end
 
@@ -19,6 +20,34 @@ struct BinaryExpansionForm{T<:DispatchForm} <: ExpansionForm{T} end
 struct BinaryExpansionDispatchForm{T<:DispatchForm} <: ExpansionForm{T} end
 struct BinaryExpansionInvestmentForm{T<:DispatchForm} <: ExpansionForm{T} end
 
+struct FormulationDescription
+    name::Symbol
+    form::DataType
+end
+
+FormulationDescription(tup) = FormulationDescription(tup...)
+
+const formulations = FormulationDescription.([
+    (:lindisp, LinearDispatchForm),
+    (:ucdisp, UnitCommittmentForm),
+    (:linexp_lindisp, LinearExpansionForm{LinearDispatchForm}),
+    (:linexp_ucdisp, LinearExpansionForm{UnitCommittmentForm})
+])
+
+function resolve(::Type{DeviceFormulation}, name::Symbol)
+    j = findfirst(fd -> fd.name == name, formulations)
+    !isnothing(j) ? formulations[j].form : error("Formulation $name has not been registered in `formulations`")
+end
+
+function naming(::Type{T}) where T <: DeviceFormulation
+    j = findfirst(fd -> fd.form == T, formulations)
+    !isnothing(j) ? formulations[j].name : error("Formulation $T has not been registered in `formulations`")
+end
+
+formulation(::Device{DF}) where DF <: DeviceFormulation = DF
+
+
+
 # TODO multi-year formulations
 
 ## ModelTypes
@@ -31,6 +60,7 @@ abstract type ExpansionModel <: ModelType end
 
 # If nothing else is said, let's say it's fine
 demote_formulation(::Type{ExpansionModel}, ::Type{DF}) where DF <: ExpansionForm = DF
+demote_formulation(::Type{ExpansionModel}, ::Type{DF}) where DF <: DispatchForm = DF
 demote_formulation(::Type{DispatchModel},  ::Type{DF}) where DF <: DispatchForm = DF
 
 # An expansion form should demote to its respective DispatchForm
