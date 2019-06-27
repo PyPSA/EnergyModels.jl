@@ -29,7 +29,7 @@ function determine_subnetworks!(m::EnergyModel)
 
     empty!(m.subnetworks)
     for (i,b) = enumerate(sort!(conn_comp, by=length, rev=true))
-        push!(m, SubNetwork(m, Symbol(:subnetwork, i), Axis{axisname(buses)}(buses[b]), Dict{Symbol}{Any}()))
+        push!(m, SubNetwork(m, Symbol(:subnetwork, i), Axis{axisname(buses)}(buses[b])))
     end
 end
 

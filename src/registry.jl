@@ -1,19 +1,26 @@
-const ComponentType = Type{<:Component}
-struct ComponentAttributes
-    comptype::ComponentType
+struct ComponentDescription
+    name::Symbol
+    componenttype::Type{<:Component}
     attributes::DataFrame
 end
 
-const comptypenames = Dict{ComponentType,Symbol}()
-const components = Dict{Symbol,ComponentAttributes}()
+const componentdescriptions = ComponentDescription[]
 
-resolve(comptypename::Symbol) = components[comptypename].comptype
-attributes(comptypename::Symbol) = components[comptypename].attributes
+function componentdescription(name::Symbol)
+    j = findfirst(cd -> cd.name == name, componentdescriptions)
+    !isnothing(j) ? componentdescriptions[j] : error("Component {componentname} has not been registered")
+end
+function componentdescription(::Type{T}) where T <: Component
+    j = findfirst(cd -> cd.componenttype == T, componentdescriptions)
+    !isnothing(j) ? componentdescriptions[j] : error("Component type {T} has not been registered")
+end
 
+resolve(::Type{Component}, name::Symbol) = componentdescription(name).componenttype
+attributes(name) = componentdescription(name).attributes
+
+addcomponent(cd::ComponentDescription) where T<:Component = push!(componentdescriptions, cd)
 addcomponent(::Type{T}) where T<:Component = addcomponent(T, naming(T))
-addcomponent(::Type{T}, name::Symbol) where T<:Component = addcomponent(T, name, ComponentAttributes(T, DataFrame()))
-addcomponent(::Type{T}, name::Symbol, eq::ComponentAttributes) where T<:Component =
-    (components[name] = eq; comptypenames[T] = name)
+addcomponent(::Type{T}, name::Symbol) where T<:Component = addcomponent(ComponentDescription(name, T, DataFrame()))
 
 function addcomponent(::Type{T}, name::Symbol, axes, filename) where T<:Component
     axes = (first(axes)=>name, Base.tail(axes)...)
@@ -23,11 +30,13 @@ function addcomponent(::Type{T}, name::Symbol, axes, filename) where T<:Componen
     rename_dimensions(x) = tuple(recode(Symbol.(split(x, ',')), axes...)...)
     df[:dimensions] = map(x->ismissing(x) ? () : rename_dimensions(x), df[:dimensions])
 
-    addcomponent(T, name, ComponentAttributes(T, df))
+    addcomponent(ComponentDescription(name, T, df))
 end
 
-function naming(T::ComponentType)
-    haskey(comptypenames, T) && return comptypenames[T]
+function naming(::Type{T}) where T <: Component
+    j = findfirst(cd -> cd.componenttype == T, componentdescriptions)
+    !isnothing(j) && return componentdescriptions[j]
+
     s = lowercase(string(T.name.name))
     Symbol(s, in(s[end], ('s', 'h')) ? "es" : "s")
 end

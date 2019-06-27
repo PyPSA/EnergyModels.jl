@@ -3,37 +3,70 @@
 
 cost(d::Store) = sum(d[:marginal_cost] .* AxisArray(d[:p])) + sum(d[:capital_cost] .* (AxisArray(d[:e_nom]) - getparam(d, :e_nom)))
 
-function addto!(jm::ModelView, m::EnergyModel, d::Store)
-    T = axis(d, :snapshots)
-    S = axis(d)
+function addto!(jm::ModelView, m::EnergyModel, d::Store{DF}) where
+      {DDF, DF <: LinearExpansionForm{DDF}}
 
+    addto!(jm, m, with_formulation(d, LinearExpansionInvestmentForm))
+    addto!(jm, m, with_formulation(d, LinearExpansionDispatchForm{DDF}))
+end
+
+function addto!(jm::ModelView, m::EnergyModel, d::Store{DF}) where
+      {DF <: LinearExpansionInvestmentForm}
+
+    S = axis(m, d)
+
+    e_nom_min = get(d, :e_nom_min, S)
+    e_nom_max = get(d, :e_nom_max, S)
+
+    @variable(jm, e_nom_min[s] <= e_nom[s=S] <= e_nom_max[s])
+end
+
+function addto!(jm::ModelView, m::EnergyModel, d::Store{DF}) where
+      {DDF, DF <: LinearExpansionDispatchForm{DDF}}
+
+    S = axis(m, d)
+    T = axis(m, :snapshots)
+
+    e_nom = get(d, :e_nom)
     e_min_pu = get(d, :e_min_pu, S, T)
     e_max_pu = get(d, :e_max_pu, S, T)
 
-    if isvar(d, :e_nom)
-        e_nom_min = get(d, :e_nom_min, S)
-        e_nom_max = get(d, :e_nom_max, S)
+    @variable(jm, e[s=S,t=T])
 
-        @variables jm begin
-            e_nom_min[s] <= e_nom[s=S] <= e_nom_max[s]
-            e[s=S,t=T]
-        end
-
-        @constraints jm begin
-            e_lower[s=S,t=T], e[s,t] >= e_min_pu[s,t] * e_nom[s]
-            e_upper[s=S,t=T], e[s,t] <= e_max_pu[s,t] * e_nom[s]
-        end
-    else
-        e_nom = get(d, :e_nom, S)
-
-        @variables jm begin
-            e_min_pu[s,t] * e_nom[s] <= e[s=S,t=T] <= e_max_pu[s,t] * e_nom[s]
-        end
+    @constraints jm begin
+        e_lower[s=S,t=T], e[s,t] >= e_min_pu[s,t] * e_nom[s]
+        e_upper[s=S,t=T], e[s,t] <= e_max_pu[s,t] * e_nom[s]
     end
 
-    @variable(jm, p[s=S,t=T])
+    addto!_soc(jm, m, d)
+end
 
+
+function addto!(jm::ModelView, m::EnergyModel, d::Store{DF}) where
+      {DF <: DispatchForm}
+
+    S = axis(m, d)
+    T = axis(m, :snapshots)
+
+    e_nom = get(d, :e_nom, S)
+    e_min_pu = get(d, :e_min_pu, S, T)
+    e_max_pu = get(d, :e_max_pu, S, T)
+
+    @variable(jm, e_min_pu[s,t] * e_nom[s] <= e[s=S,t=T] <= e_max_pu[s,t] * e_nom[s])
+
+    addto!_soc(jm, m, d)
+end
+
+
+function addto!_soc(jm::ModelView, m::EnergyModel, d::Store)
+
+    S = axis(m, d)
+    T = axis(m, :snapshots)
+
+    e = get(d, :e)
     standing_loss = get(d, :standing_loss, S)
+
+    @variable(jm, p[S,T])
 
     if d[:e_cyclic]
         e_prev = circshift(e, :snapshots=>1)

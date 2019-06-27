@@ -1,51 +1,51 @@
-using Base.Iterators: flatten
-
-abstract type Data end
-abstract type ExpressionType end
-
-abstract type Emission <: ExpressionType end
-struct Cost <: ExpressionType end
-struct CO2 <: Emission end
-
-"Can be `add`ed to a JuMP model, must have an `objects` dictionary and a `class`"
-abstract type Component end
-
-abstract type AbstractEnergyModel end
-
 "Represents a synchronuous zone. Induced by determine_subnetworks!(model)"
 struct SubNetwork{T <: AbstractEnergyModel} <: Component
     model::T
     class::Symbol
     buses::Axis
-    objects::Dict{Symbol,Any}
 end
 
 "Connection points at which energy balance is upheld, has `axis` and `addto!`"
 struct Bus{T <: AbstractEnergyModel} <: Component
     model::T
     class::Symbol
-    objects::Dict{Symbol,Any}
 end
 
-"Connected to at least one `Bus`. Additionally to `addto!` provides `p`, `cost` and `busattributes`"
-abstract type Device <: Component end
-
-mutable struct EnergyModel <: AbstractEnergyModel
+mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <: AbstractEnergyModel
     devices::Dict{Symbol,Device}
-    subnetworks::Dict{Symbol,SubNetwork{EnergyModel}}
-    buses::Dict{Symbol,Bus{EnergyModel}}
-    data::Data
+    subnetworks::Dict{Symbol,SubNetwork{EnergyModel{MT,TF}}}
+    buses::Dict{Symbol,Bus{EnergyModel{MT,TF}}}
+    data::AbstractData
+    parent::Union{AbstractEnergyModel,Nothing}
     jumpmodel::Union{JuMP.AbstractModel,Nothing}
+    jumpobjects::Dict{Symbol,Dict{Symbol}{Any}}
 end
 
+ensure_optimizerfactory(opt::JuMP.OptimizerFactory) = opt
+ensure_optimizerfactory(::Type{T}) where T <: MOI.AbstractOptimizer = with_optimizer(T)
+
+function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData; parent=nothing, jumpmodel=nothing, optimizer=nothing) where
+      {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
+
+    if isnothing(jumpmodel) && !isnothing(optimizer)
+        jumpmodel = JuMP.Model(ensure_optimizerfactory(optimizer))
+    end
+
+    EnergyModel{MT,TF}(Dict{Symbol,Device}(),
+                       Dict{Symbol,SubNetwork}(),
+                       Dict{Symbol,Bus}(),
+                       data,
+                       parent,
+                       jumpmodel,
+                       Dict{Symbol, Dict{Symbol}{Any}}())
+end
 
 EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
-EnergyModel(data::Data) = load(EnergyModel(Dict{Symbol,Device}(), Dict{Symbol,SubNetwork}(), Dict{Symbol,Bus}(), data, nothing))
+EnergyModel(data::AbstractData; kwargs...) = load(EnergyModel(ExpansionModel, PM.DCPlosslessForm, data; kwargs...))
 
+# TODO which forms are picked should be determined by Data or the Components
 function load(m::EnergyModel)
-    for T in modelcomponents(m.data), class in classes(m.data, T)
-        push!(m, T(m, class, Dict{Symbol}{Any}()))
-    end
+    for (class, T) in components(m.data) push!(m, T(m, class)) end
     determine_subnetworks!(m)
     m
 end
@@ -81,9 +81,6 @@ naming(c::Component, args...) = Symbol(naming(c), flatten((:(::), a) for a=args)
 
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, d::Device) = intersect((findall(pred, d[attr]) for attr = busattributes(d))...)
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Bus) = findall(pred, axis(c).val)
-
-isvar(m::EnergyModel, c::Component, attr::Symbol) = isvar(m.data, c, attr)
-isvar(c::Component, attr::Symbol) = isvar(model(c), c, attr)
 
 function Base.getindex(m::EnergyModel, class::Symbol)
     for t = (:devices, :buses, :subnetworks)
@@ -134,7 +131,11 @@ Base.get(c::Component, attr::Symbol, axes...) = WrappedArray(get(c, attr), axes.
 
 Base.getindex(c::Component, attr::Symbol) = get(c, attr)
 
-getjump(c::Component, attr::Symbol) = get(c.objects, attr, nothing)
+function getjump(m::EnergyModel, class::Symbol, attr::Symbol)
+    ret = get(get!(m.jumpobjects, class, Dict{Symbol}{Any}()), attr, nothing)
+    (!isnothing(ret) || isnothing(m.parent)) ? ret : getjump(m.parent, class, attr)
+end
+getjump(c::Component, attr::Symbol) = getjump(model(c), c.class, attr)
 JuMP.getvalue(c::Component, attr::Symbol) = getvalue.(getjump(c, attr))
 JuMP.getdual(c::Component, attr::Symbol) = getdual.(getjump(c, attr))
 getparam(c::Component, attr::Symbol) = get(model(c).data, c, attr)

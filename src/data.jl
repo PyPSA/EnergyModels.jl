@@ -1,68 +1,42 @@
 using NCDatasets
 
-abstract type AbstractNcData <: Data end
+abstract type AbstractNcData <: AbstractData end
+
+function gettypeparams end
+function components end
 
 include("data/pypsa.jl")
 
-struct NcData <: Data
+struct NcData <: AbstractNcData
     dataset::Dataset
 end
-
-# struct QAxis
-#     name::Symbol
-#     length::Int32
-# end
-
-# Later we should represent variants more by something like this
-#
-# struct Quantity
-#     name::Symbol
-#     isvariable::Bool
-#     dimensions::Tuple{Vararg{Symbol}}
-#     Quantity(name, isvariable, dimensions) = new(name, isvariable, tuple(sort!(collect(dimensions))...))
-# end
-#
-# const Variant = NTuple{N,Quantity} where N
-# Variant(quantities::Vararg{Quantity}) = Variant(sort!(collect(quantities)))
-# Base.isless(a::Quantity, b::Quantity) = a.isvariable != b.isvariable ? a.isvariable < b.isvariable : a.name < b.name
-# Base.show(io::IO, v::Variant) = for q=v print(io, "::"); show(io, q) end
-# Base.show(io::IO, q::Quantity) = print(io, string(q.name, q.isvariable ? "_v" : "", "_", join(string.(q.dimensions), ":")))
-
-# or even type based as a variant of
-
-# struct QAxis{name,N} end
-
-# struct Quantity{name,isvar,N,Ax}
-#     Quantity{name,isvar,N,Ax}() where {name,isvar<:Bool,N,Ax<:Tuple{Vararg{QAxis,N}}} = new{name,isvar,N,Ax}()
-# end
 
 function NcData(filename::String)
     ds = Dataset(filename)
     (haskey(ds.attrib, "network_pypsa_version") ? PypsaNcData : NcData)(ds)
 end
 
-function load(filename::String)::Data
+function load(filename::String)::AbstractData
     if endswith(filename, ".nc")
-        NcData(filename)
+        Data(fallback=NcData(filename))
     else
         error("file ending of '$filename' not recognized")
     end
 end
 
 function Base.get(data::NcData, args...)
-    da = data.dataset[naming(args...)]
+    da = data.dataset[String(naming(args...))]
     AxisArray(da[:], (axis(data, n) for n = dimnames(da))...)
 end
 
-axis(data::AbstractNcData, n::Symbol) = axis(data, String(n))
-axis(data::AbstractNcData, n::String) = Axis{Symbol(n)}(disallowmissing(data.dataset[n][:]))
+axis(data::AbstractNcData, n::Symbol) = Axis{n}(nomissing(data.dataset[String(n)][:]))
 
-# Interface for the abstract type Data
+# Interface for the abstract type AbstractData
 #
 # * Required methods
 #
-# Base.get(data, device, class, param)
-# returns an AxisArray of `param` from `device::class`
+# Base.get(data, class, param)
+# returns an AxisArray of `param` from `class`
 #
 # devices(data)
 # returns Array{DataType} with the described devices
@@ -70,39 +44,69 @@ axis(data::AbstractNcData, n::String) = Axis{Symbol(n)}(disallowmissing(data.dat
 # classes(data, ::Type{T}) where T<:Device
 # returns Array{Symbol} of the described classes
 
+struct ComponentDesc
+    name::Symbol
+    componenttype
+    data::Dict{Symbol,AxisArray}
+end
+ComponentDesc(tup) = ComponentDesc(tup...)
 
-struct DictData <: Data
-    axes::Dict{Symbol, Axis}
-    data::Dict{Symbol, AxisArray}
-    variables::Dict{Symbol, Set}
-    devices::Vector{Tuple{Symbol, Symbol}}
+struct Data{T} <: AbstractData
+    components::Dict{Symbol,ComponentDesc}
+    axes::Dict{Symbol,Axis}
+    fallback::T
 end
 
-DictData(; variables=Dict{Symbol,Set}(), kwargs...) = DictData(Dict{Symbol,AxisArray}(kwargs), variables=variables)
-function DictData(data::Dict{Symbol, AxisArray}; variables=Dict{Symbol,Set}())
-    axs = Dict{Symbol, Axis}()
-    for a = values(data),
-        ax = axes(a)
+Data(; components=Dict{Symbol,ComponentDesc}(), axes=Dict{Symbol,Axis}(), fallback=nothing) = Data(components, axes, fallback)
 
-        if haskey(axs, axisname(ax))
-            @assert axs[axisname(ax)] == ax
-        else
-            axs[axisname(ax)] = ax
+AxisArrays.axes(cd::ComponentDesc) =
+    Iterators.flatten(AxisArrays.axes(attr) for attr in values(cd.data))
+
+function collectaxes(components; kwargs...)
+    axdict = Dict{Symbol, Axis}()
+    for cd in components
+        for ax in AxisArrays.axes(cd; kwargs...)
+            axname = axisname(ax)
+            if haskey(axdict, axname)
+                @assert axdict[axname] == ax
+            else
+                axdict[axname] = ax
+            end
         end
     end
-
-    devices = unique((Symbol.(split(string(k), "::")[[1,2]])...,) for k = keys(data))
-
-    DictData(axs, data, variables, devices)
+    axdict
 end
 
-devices(data::DictData) = resolve.(unique(typ for (typ, class) = data.devices))
-classes(data::DictData, T) = classes(data, naming(Symbol, T))
-classes(data::DictData, ctype::Symbol) = (class for (typ, class) = data.devices if typ == ctype)
-isvar(data::DictData, c::Device, class, quantity) = in(quantity, data.variables[naming(Symbol, c, class)])
+Data(components::Vararg{Tuple{Symbol,Any,Dict{Symbol,AxisArray}}}; kwargs...) = Data(ComponentDesc.(components); kwargs...)
+function Data(components::Vector{ComponentDesc}; fallback=nothing)
+    compdict = Dict(cd.name => cd for cd in components)
+    axdict = collectaxes(components)
 
-axis(data::DictData, n::Symbol) = data.axes[n]
-axis(data::DictData, n::String) = axis(data, Symbol(n))
-axis(data::DictData, c::Device, class) = axis(data, naming(Symbol, c, class))
+    Data(compdict, axdict, fallback)
+end
 
-Base.get(data::DictData, c::Device, class, quantity) = data.data[naming(Symbol, c, class, quantity)]
+_components(data) = map(cd->(cd.name => cd.componenttype), values(data.components))
+components(data::Data{Nothing}) = _components(data)
+components(data::Data{<:AbstractData}) =
+    unique(p->p.first, vcat(components(data.fallback), _components(data)))
+
+function axis(data::Data{<:AbstractData}, n::Symbol)
+    ret = get(data.axes, n, nothing)
+    !isnothing(ret) ? ret : axis(data.fallback, n)
+end
+axis(data::Data{Nothing}, n::Symbol) = data.axes[n]
+axis(data::AbstractData, c::Component) = axis(data, naming(c))
+
+Base.get(data::Data{Nothing}, c::Component, quantity) = data.components[naming(c)].data[quantity]
+function Base.get(data::Data{<:AbstractData}, c::Component, quantity)
+    componentdesc = get(data.components, naming(c), nothing)
+    if !isnothing(componentdesc)
+        ret = get(componentdesc.data, quantity, nothing)
+        !isnothing(ret) ? ret : get(data.fallback, c, quantity)
+    else
+        get(data.fallback, c, quantity)
+    end
+end
+
+gettypeparams(data::Data{Nothing}, device::Device) = error("Not implemented yet")
+gettypeparams(data::Data{<:AbstractData}, device::Device) = gettypeparams(data.fallback, device)

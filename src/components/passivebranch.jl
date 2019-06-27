@@ -1,29 +1,80 @@
 # PassiveBranch
-abstract type PassiveBranch<: Branch end
+abstract type PassiveBranch{DF<:DeviceFormulation} <: Branch{DF} end
 
 cost(d::PassiveBranch) = sum(d[:capital_cost] .* (AxisArray(d[:s_nom]) .- getparam(d, :s_nom)))
 
-## Lines and Transformers
-effectiveimpedance(d::PassiveBranch) = impedance(d)[d[:carrier] == "DC" ? :r_pu_eff : :x_pu_eff]
-phaseshift(d::PassiveBranch) = 0.
-
+# Split lines into AC and DC?
 @adddevice(Line, PassiveBranch, :lines, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "lines.csv"))
 
 @adddevice(Transformer, PassiveBranch, :transformers, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "transformers.csv"))
 
+function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where
+      {DDF, DF <: LinearExpansionForm{DDF}}
+
+    addto!(jm, m, with_formulation(d, LinearExpansionInvestmentForm))
+    addto!(jm, m, with_formulation(d, LinearExpansionDispatchForm{DDF}))
+end
+
+
+function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where
+      {DF <: LinearExpansionInvestmentForm}
+
+    L = axis(m, d)
+
+    s_nom_min = get(d, :s_nom_min, L)
+    s_nom_max = get(d, :s_nom_max, L)
+
+    @variable(jm, s_nom_min[l] <= s_nom[l=L] <= s_nom_max[l])
+end
+
+function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where
+      {DDF, DF <: LinearExpansionDispatchForm{DDF}}
+
+    L = axis(m, d)
+    T = axis(m, :snapshots)
+
+    s_nom = get(d, :s_nom)
+    s_max_pu = get(d, :s_max_pu, L, T)
+
+    @variable(jm, p[L,T])
+
+    @constraints jm begin
+        p_upper[l=L,t=T], p[l,t] <= s_max_pu[l,t] * s_nom[l]
+        p_lower[l=L,t=T], p[l,t] >= - s_max_pu[l,t] * s_nom[l]
+    end
+end
+
+
+function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where {DF <: DispatchForm}
+
+    L = axis(m, d)
+    T = axis(m, :snapshots)
+
+    s_nom = get(d, :s_nom)
+    s_max_pu = get(d, :s_max_pu, L, T)
+
+    @variable(jm, - s_max_pu[l,t] * s_nom[l] <= p[l=L,t=T] <= s_max_pu[l,t] * s_nom[l])
+end
+
+## Lines and Transformers
+effectiveimpedance(d::PassiveBranch) = impedance(d)[d[:carrier] == "DC" ? :r_pu_eff : :x_pu_eff]
+
+phaseshift(d::PassiveBranch) = 0.
+phaseshift(d::Transformer) = gettypeparams(d.model.data, d)[:phase_shift]
+
 function impedance(d::Line)
-    ax = axis(d)
+    L = axis(d)
     bus_v_nom = d.model[Bus][:v_nom]
     v_nom = bus_v_nom[convert(Array{Int64}, indexin(d[:bus0], first(axisvalues(bus_v_nom))))]
 
-    p = gettypeparams(d.model.data, d, d.class)
+    p = gettypeparams(d.model.data, d)
     if p !== nothing
         num_parallel = d[:num_parallel]
         length = d[:length]
 
         # line types
-        x = AxisArray(p[:x_per_length] .* length ./ num_parallel, ax)
-        r = AxisArray(p[:r_per_length] .* length ./ num_parallel, ax)
+        x = AxisArray(p[:x_per_length] .* length ./ num_parallel, L)
+        r = AxisArray(p[:r_per_length] .* length ./ num_parallel, L)
         # b = AxisArray(2pi*1e-9*p[:f_nom]*p[:d_per_length] .* length .* num_parallel, ax)
     else
         x = d[:x]
@@ -31,8 +82,8 @@ function impedance(d::Line)
         # b = d[:b]
     end
 
-    x_pu = AxisArray(x ./ v_nom.^2, ax)
-    r_pu = AxisArray(r ./ v_nom.^2, ax)
+    x_pu = AxisArray(x ./ v_nom.^2, L)
+    r_pu = AxisArray(r ./ v_nom.^2, L)
     # b_pu = AxisArray(r .* v_nom.^2, ax)
 
     Dict(:x => x, :r => r,
@@ -43,36 +94,9 @@ function impedance(d::Line)
          )
 end
 
-function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch)
-    T = axis(m, :snapshots)
-    L = axis(d)
-
-    s_max_pu = get(d, :s_max_pu, L, T)
-
-    if isvar(d, :s_nom)
-        s_nom_min = get(d, :s_nom_min, L)
-        s_nom_max = get(d, :s_nom_max, L)
-
-        @variables jm begin
-            s_nom_min[l] <= s_nom[l=L] <= s_nom_max[l]
-            p[l=L,t=T]
-        end
-
-        @constraints jm begin
-            p_upper[l=L,t=T], p[l,t] <= s_max_pu[l,t] * s_nom[l]
-            p_lower[l=L,t=T], p[l,t] >= - s_max_pu[l,t] * s_nom[l]
-        end
-    else
-        s_nom = get(d, :s_nom, L)
-        @variable(jm, - s_max_pu[l,t] * s_nom[l] <= p[l=L,t=T] <= s_max_pu[l,t] * s_nom[l])
-    end
-end
-
-
-phaseshift(d::Transformer) = gettypeparams(d.model.data, d, class)[:phase_shift]
 function impedance(d::Transformer)
     ax = axis(d)
-    p = gettypeparams(d.model.data, d, d.class)
+    p = gettypeparams(d.model.data, d)
 
     if p !== nothing
         num_parallel = d[:num_parallel]

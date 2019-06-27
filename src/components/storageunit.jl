@@ -9,35 +9,73 @@ function p(d::StorageUnit)
     ((s,t)->p_dispatch[s,t] - p_store[s,t],)
 end
 
-function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit)
-    T = axis(d, :snapshots)
-    S = axis(d)
+function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit{DF}) where
+      {DDF, DF <: LinearExpansionForm{DDF}}
 
+    addto!(jm, m, with_formulation(d, LinearExpansionInvestmentForm))
+    addto!(jm, m, with_formulation(d, LinearExpansionDispatchForm{DDF}))
+end
+
+function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit{DF}) where
+      {DF <: LinearExpansionInvestmentForm}
+
+    S = axis(m, d)
+
+    p_nom_min = get(d, :p_nom_min, S)
+    p_nom_max = get(d, :p_nom_max, S)
+
+    @variable(jm, p_nom_min[s] <= p_nom[s=S] <= p_nom_max[s])
+end
+
+function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit{DF}) where
+      {DDF, DF <: LinearExpansionDispatchForm{DDF}}
+
+    S = axis(m, d)
+    T = axis(m, :snapshots)
+
+    p_nom = get(d, :p_nom)
     p_min_pu = get(d, :p_min_pu, S, T)
     p_max_pu = get(d, :p_max_pu, S, T)
 
-    if isvar(d, :p_nom)
-        p_nom_min = get(d, :p_nom_min, S)
-        p_nom_max = get(d, :p_nom_max, S)
-
-        @variables jm begin
-            p_nom_min[s] <= p_nom[s=S] <= p_nom_max[s]
-            p_store[s=S,t=T] >= 0
-            p_dispatch[s=S,t=T] >= 0
-        end
-
-        @constraints jm begin
-            p_lower[s=S,t=T], p_store[s,t] <= - p_min_pu[s,t] * p_nom[s]
-            p_upper[s=S,t=T], p_dispatch[s,t] <= p_max_pu[s,t] * p_nom[s]
-        end
-    else
-        p_nom = get(d, :p_nom, S)
-
-        @variables jm begin
-            0 <= p_store[s=S,t=T] <= - p_min_pu[s,t] * p_nom[s]
-            0 <= p_dispatch[s=S,t=T] <= p_max_pu[s,t] * p_nom[s]
-        end
+    @variables jm begin
+        p_store[s=S,t=T] >= 0
+        p_dispatch[s=S,t=T] >= 0
     end
+
+    @constraints jm begin
+        p_lower[s=S,t=T], p_store[s,t] <= - p_min_pu[s,t] * p_nom[s]
+        p_upper[s=S,t=T], p_dispatch[s,t] <= p_max_pu[s,t] * p_nom[s]
+    end
+
+    addto!_state_of_charge(jm, m, d)
+end
+
+function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit{DF}) where
+      {DF <: DispatchForm}
+
+    S = axis(m, d)
+    T = axis(m, :snapshots)
+
+    p_nom = get(d, :p_nom, S)
+    p_min_pu = get(d, :p_min_pu, S, T)
+    p_max_pu = get(d, :p_max_pu, S, T)
+
+    @variables jm begin
+        0 <= p_store[s=S,t=T] <= - p_min_pu[s,t] * p_nom[s]
+        0 <= p_dispatch[s=S,t=T] <= p_max_pu[s,t] * p_nom[s]
+    end
+
+    addto!_state_of_charge(jm, m, d)
+end
+
+
+function addto!_state_of_charge(jm::ModelView, m::EnergyModel, d::StorageUnit)
+    S = axis(m, d)
+    T = axis(m, :snapshots)
+
+    p_nom = get(d, :p_nom)
+    p_store = get(d, :p_store)
+    p_dispatch = get(d, :p_dispatch)
 
     inflow = get(d, :inflow, S, T)
     max_hours = get(d, :max_hours, S, T)

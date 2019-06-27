@@ -1,3 +1,5 @@
+build!(m::EnergyModel) = addto!(m.jumpmodel, m)
+
 function addto!(jm::JuMP.AbstractModel, m::EnergyModel)
     @info("* Equations for individual devices")
     for d = devices(m)
@@ -15,5 +17,5 @@ function addto!(jm::JuMP.AbstractModel, m::EnergyModel)
     @info("* Cost minimization objective")
     @objective(jm, Min, sum(cost(d) for d = devices(m)))
 
-    jm # TODO? jupyterlab breaks when trying to display a huge model
+    jm
 end

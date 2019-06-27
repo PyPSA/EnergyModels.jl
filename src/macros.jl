@@ -9,12 +9,15 @@ end
 
 macro adddevice(type, abstype, name, axes, file)
     type = esc(type)
+    abstype = esc(abstype)
     quote
-        struct $type <: $(esc(abstype))
+        struct $type{DF<:DeviceFormulation} <: $abstype{DF}
             model::EnergyModel
             class::Symbol
-            objects::Dict{Symbol,Any}
         end
+        $type{DF}(d::$type) where DF = $type{DF}(d.model, d.class)
+        $type{DF}(d::$type, ::Type{NewDF}) where {DF <: DeviceFormulation, NewDF <: DeviceFormulation} = $type{NewDF}(d)
+
         addcomponent($type, $(esc(name)), $(esc(axes)), $(esc(file)))
     end
 end
