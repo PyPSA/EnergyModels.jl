@@ -60,14 +60,14 @@ end
 effectiveimpedance(d::PassiveBranch) = impedance(d)[d[:carrier] == "DC" ? :r_pu_eff : :x_pu_eff]
 
 phaseshift(d::PassiveBranch) = 0.
-phaseshift(d::Transformer) = gettypeparams(d.model.data, d, class)[:phase_shift]
+phaseshift(d::Transformer) = gettypeparams(d.model.data, d)[:phase_shift]
 
 function impedance(d::Line)
     L = axis(d)
     bus_v_nom = d.model[Bus][:v_nom]
     v_nom = bus_v_nom[convert(Array{Int64}, indexin(d[:bus0], first(axisvalues(bus_v_nom))))]
 
-    p = gettypeparams(d.model.data, d, d.class)
+    p = gettypeparams(d.model.data, d)
     if p !== nothing
         num_parallel = d[:num_parallel]
         length = d[:length]
@@ -96,7 +96,7 @@ end
 
 function impedance(d::Transformer)
     ax = axis(d)
-    p = gettypeparams(d.model.data, d, d.class)
+    p = gettypeparams(d.model.data, d)
 
     if p !== nothing
         num_parallel = d[:num_parallel]

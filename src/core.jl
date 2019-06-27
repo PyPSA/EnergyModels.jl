@@ -45,14 +45,7 @@ EnergyModel(data::AbstractData; kwargs...) = load(EnergyModel(ExpansionModel, PM
 
 # TODO which forms are picked should be determined by Data or the Components
 function load(m::EnergyModel)
-    for T in modelcomponents(m.data), class in classes(m.data, T)
-        if (T <: SubNetwork) || (T <: Bus)
-            push!(m, T(m, class))
-        else
-            push!(m, T{LinearExpansionForm{LinearDispatchForm}}(m, class))
-        end
-
-    end
+    for (class, T) in components(m.data) push!(m, T(m, class)) end
     determine_subnetworks!(m)
     m
 end
