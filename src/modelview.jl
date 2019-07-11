@@ -21,13 +21,15 @@ Base.broadcastable(view::ModelView) = Ref(view)
 JuMP.object_dictionary(view::ModelView) = get!(view.model.jumpobjects, view.class, Dict{Symbol}{Any}())
 
 JuMP.variable_type(view::ModelView) = variable_type(view.jumpmodel)
-JuMP.add_variable(view::ModelView, v::JuMP.AbstractVariable, name::String="") = add_variable(view.jumpmodel, v, prefix(view, name))
+JuMP.add_variable(view::ModelView, v::JuMP.AbstractVariable, name::String="") =
+    view.model.jumpnames ? add_variable(view.jumpmodel, v, prefix(view, name)) : add_variable(view.jumpmodel, v)
 JuMP.delete(view::ModelView, variable_ref::VariableRef) = delete(view.jumpmodel, variable_ref)
 JuMP.is_valid(view::ModelView, variable_ref::VariableRef) = is_valid(view.jumpmodel, variable_ref)
 JuMP.num_variables(view::ModelView) = num_variables(view.jumpmodel)
 
 JuMP.constraint_type(view::ModelView) = constraint_type(view.jumpmodel)
-JuMP.add_constraint(view::ModelView, c::JuMP.AbstractConstraint, name::String="") = add_constraint(view.jumpmodel, c, prefix(view, name))
+JuMP.add_constraint(view::ModelView, c::JuMP.AbstractConstraint, name::String="") =
+    view.model.jumpnames ? add_constraint(view.jumpmodel, c, prefix(view, name)) : add_constraint(view.jumpmodel, c)
 JuMP.delete(view::ModelView, constraint_ref::ConstraintRef) = delete(view.jumpmodel, constraint_ref)
 JuMP.is_valid(view::ModelView, constraint_ref::ConstraintRef) = is_valid(view.jumpmodel, constraint_ref)
 JuMP.num_constraints(view::ModelView) = num_constraints(view.jumpmodel)
@@ -41,8 +43,10 @@ JuMP.objective_function_type(view::ModelView) = objective_function_type(view.jum
 JuMP.objective_function(view::ModelView) = objective_function(view.jumpmodel)
 
 # Names
-JuMP.variable_by_name(view::ModelView, name::String) = variable_by_name(view.jumpmodel, prefix(view, name))
-JuMP.constraint_by_name(view::ModelView, name::String) = constraint_by_name(view.jumpmodel, prefix(view, name))
+JuMP.variable_by_name(view::ModelView, name::String) =
+    view.model.jumpnames ? variable_by_name(view.jumpmodel, prefix(view, name)) : nothing
+JuMP.constraint_by_name(view::ModelView, name::String) =
+    view.model.jumpnames ? constraint_by_name(view.jumpmodel, prefix(view, name)) : nothing
 
 # Show
 JuMP.show_backend_summary(io::IO, view::ModelView) = show_backend_summary(io, view.jumpmodel)

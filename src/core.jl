@@ -18,13 +18,15 @@ mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <
     data::AbstractData
     parent::Union{AbstractEnergyModel,Nothing}
     jumpmodel::Union{JuMP.AbstractModel,Nothing}
+    jumpnames::Bool
     jumpobjects::Dict{Symbol,Dict{Symbol}{Any}}
 end
 
 ensure_optimizerfactory(opt::JuMP.OptimizerFactory) = opt
 ensure_optimizerfactory(::Type{T}) where T <: MOI.AbstractOptimizer = with_optimizer(T)
 
-function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData; parent=nothing, jumpmodel=nothing, optimizer=nothing) where
+function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
+                     parent=nothing, jumpmodel=nothing, jumpnames=true, optimizer=nothing) where
       {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
 
     if isnothing(jumpmodel) && !isnothing(optimizer)
@@ -37,15 +39,17 @@ function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData; parent=nothing,
                        data,
                        parent,
                        jumpmodel,
+                       jumpnames,
                        Dict{Symbol, Dict{Symbol}{Any}}())
 end
 
 EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
 EnergyModel(data::AbstractData; kwargs...) = load(EnergyModel(ExpansionModel, PM.DCPlosslessForm, data; kwargs...))
 
-# TODO which forms are picked should be determined by Data or the Components
 function load(m::EnergyModel)
-    for (class, T) in components(m.data) push!(m, T(m, class)) end
+    for (class, T) in components(m.data)
+        push!(m, T(m, class))
+    end
     determine_subnetworks!(m)
     m
 end
