@@ -7,6 +7,9 @@ struct WrappedArray{T,N,M,D,Ax} <: AbstractArray{T,N}
     data::D
     axes::Ax
     # Duck-typing, we assume axisnames is defined for data
+    function WrappedArray(data::T, axes::NTuple{N,Axis}) where {T<:Number, N}
+        new{T,N,0,T,typeof(axes)}(data, axes)
+    end
     function WrappedArray(data::ArrayTypes{T,M}, axes::NTuple{N,Axis}) where {T,N,M}
         @assert(issubset(axisnames(data), axisnames(axes...)),
                 "WrappedArray is missing axes: $(setdiff(axisnames(data), axisnames(axes...)))")
@@ -50,8 +53,12 @@ axisvalues(A::WrappedArray) = axisvalues(A.axes...)
 # we would instead want to give back a new WrappedArray, but this works well enough.
 @generated function Base.getindex(A::WrappedArray{T,N,M,D,Ax}, idxs...) where {T,N,M,D,Ax}
     meta = Expr(:meta, :inline, :propagate_inbounds)
-    names = axisnames(A)
-    :($meta; A.data[$((Expr(:ref, :idxs, something(findfirst(isequal(n), names))) for n=axisnames(D))...)])
+    if M == 0
+        :(A.data)
+    else
+        names = axisnames(A)
+        :($meta; A.data[$((Expr(:ref, :idxs, something(findfirst(isequal(n), names))) for n=axisnames(D))...)])
+    end
 end
 
 # # RelIterators allow to use + Int, and - Int to get to adjacent indices, BUT

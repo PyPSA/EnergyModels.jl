@@ -1,11 +1,7 @@
 import EnergyModels
 const EM = EnergyModels
 
-@static if VERSION < v"0.7.0-DEV.2005"
-    using Base.Test
-else
-    using Test
-end
+using Test
 
 @testset "EnergyModels" begin
     # @test isempty(detect_ambiguities(EM, Base, Core))
