@@ -24,11 +24,11 @@ addcomponent(::Type{T}, name::Symbol) where T<:Component = addcomponent(Componen
 
 function addcomponent(::Type{T}, name::Symbol, axes, filename) where T<:Component
     axes = (first(axes)=>name, Base.tail(axes)...)
-    df = CSV.read(filename, truestrings=["t"], falsestrings=["f"])
-    df[:attribute] = Symbol.(df[:attribute])
-    df[:default] = map(r->astype(r[:dtype], r[:default]), eachrow(df))
+    df = DataFrame(CSV.read(filename, truestrings=["t"], falsestrings=["f"]))
+    df.attribute = Symbol.(df.attribute)
+    df.default = map(r->astype(r.dtype, r.default), eachrow(df))
     rename_dimensions(x) = tuple(recode(Symbol.(split(x, ',')), axes...)...)
-    df[:dimensions] = map(x->ismissing(x) ? () : rename_dimensions(x), df[:dimensions])
+    df.dimensions = map(x->ismissing(x) ? () : rename_dimensions(x), df.dimensions)
 
     addcomponent(ComponentDescription(name, T, df))
 end
