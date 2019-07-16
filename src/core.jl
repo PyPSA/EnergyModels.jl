@@ -29,8 +29,8 @@ function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
                      parent=nothing, jumpmodel=nothing, jumpnames=true, optimizer=nothing) where
       {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
 
-    if isnothing(jumpmodel) && !isnothing(optimizer)
-        jumpmodel = JuMP.Model(ensure_optimizerfactory(optimizer))
+    if isnothing(jumpmodel)
+        jumpmodel = isnothing(optimizer) ? JuMP.Model() : JuMP.Model(ensure_optimizerfactory(optimizer))
     end
 
     EnergyModel{MT,TF}(Dict{Symbol,Device}(),
