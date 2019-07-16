@@ -8,11 +8,17 @@ const componentdescriptions = ComponentDescription[]
 
 function componentdescription(name::Symbol)
     j = findfirst(cd -> cd.name == name, componentdescriptions)
-    !isnothing(j) ? componentdescriptions[j] : error("Component {componentname} has not been registered")
+    !isnothing(j) ? componentdescriptions[j] : error("Component $componentname has not been registered")
 end
 function componentdescription(::Type{T}) where T <: Component
-    j = findfirst(cd -> cd.componenttype == T, componentdescriptions)
-    !isnothing(j) ? componentdescriptions[j] : error("Component type {T} has not been registered")
+    j = findfirst(cd -> T <: cd.componenttype, componentdescriptions)
+    !isnothing(j) ? componentdescriptions[j] : error("Component type $T has not been registered")
+end
+
+function getdefault(d::Device, attr::Symbol)
+    attrs = attributes(typeof(d))
+    i = findfirst(isequal(attr), attrs.attribute)
+    !isnothing(i) ? attrs.default[i] : error("Attribute $attr for device $d is not known")
 end
 
 resolve(::Type{Component}, name::Symbol) = componentdescription(name).componenttype
