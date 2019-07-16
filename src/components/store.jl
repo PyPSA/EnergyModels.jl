@@ -1,7 +1,7 @@
 ## Store
 @adddevice(Store, OnePort, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "attrs", "stores.csv"))
 
-cost(d::Store) = sum(d[:marginal_cost] .* AxisArray(d[:p])) + sum(d[:capital_cost] .* (AxisArray(d[:e_nom]) - getparam(d, :e_nom)))
+cost(d::Store) = sum(d[:marginal_cost] .* d[:p]) + sum(d[:capital_cost] .* (d[:e_nom] - getparam(d, :e_nom)))
 
 function addto!(jm::ModelView, m::EnergyModel, d::Store{DF}) where
       {DDF, DF <: LinearExpansionForm{DDF}}
@@ -27,7 +27,7 @@ function addto!(jm::ModelView, m::EnergyModel, d::Store{DF}) where
     S = axis(m, d)
     T = axis(m, :snapshots)
 
-    e_nom = get(d, :e_nom)
+    e_nom = get(d, :e_nom, S)
     e_min_pu = get(d, :e_min_pu, S, T)
     e_max_pu = get(d, :e_max_pu, S, T)
 

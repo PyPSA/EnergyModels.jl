@@ -3,13 +3,13 @@
 @adddevice(Link, ActiveBranch, :links, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "links.csv"))
 
 function p(d::Link)
-    p = AxisArray(d[:p])
+    p = d[:p]
     eff = d[:efficiency]
     ((l,t)->-p[l,t],       # :bus0
      (l,t)->eff[l]*p[l,t]) # :bus1
 end
 
-cost(d::Link) = sum(d[:marginal_cost] .* AxisArray(d[:p])) + sum(d[:capital_cost] .* (AxisArray(d[:p_nom]) - getparam(d, :p_nom)))
+cost(d::Link) = sum(d[:marginal_cost] .* d[:p]) + sum(d[:capital_cost] .* (d[:p_nom] - getparam(d, :p_nom)))
 
 function addto!(jm::ModelView, m::EnergyModel, d::Link{DF}) where {DDF, DF <: LinearExpansionForm{DDF}}
     addto!(jm, m, with_formulation(d, LinearExpansionInvestmentForm))

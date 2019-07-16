@@ -1,10 +1,10 @@
 @adddevice(StorageUnit, OnePort, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "attrs", "storageunits.csv"))
 
 ## StorageUnit
-cost(d::StorageUnit) = sum(d[:marginal_cost] .* AxisArray(d[:p_dispatch])) + sum(d[:capital_cost] .* (AxisArray(d[:p_nom]) - getparam(d, :p_nom)))
+cost(d::StorageUnit) = sum(d[:marginal_cost] .* d[:p_dispatch]) + sum(d[:capital_cost] .* (d[:p_nom] - getparam(d, :p_nom)))
 function p(d::StorageUnit)
-    p_dispatch = AxisArray(d[:p_dispatch])
-    p_store = AxisArray(d[:p_store])
+    p_dispatch = d[:p_dispatch]
+    p_store = d[:p_store]
 
     ((s,t)->p_dispatch[s,t] - p_store[s,t],)
 end
@@ -33,7 +33,7 @@ function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit{DF}) where
     S = axis(m, d)
     T = axis(m, :snapshots)
 
-    p_nom = get(d, :p_nom)
+    p_nom = get(d, :p_nom, S)
     p_min_pu = get(d, :p_min_pu, S, T)
     p_max_pu = get(d, :p_max_pu, S, T)
 
@@ -73,7 +73,7 @@ function addto!_state_of_charge(jm::ModelView, m::EnergyModel, d::StorageUnit)
     S = axis(m, d)
     T = axis(m, :snapshots)
 
-    p_nom = get(d, :p_nom)
+    p_nom = get(d, :p_nom, S)
     p_store = get(d, :p_store)
     p_dispatch = get(d, :p_dispatch)
 

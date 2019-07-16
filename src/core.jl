@@ -135,11 +135,18 @@ Base.get(c::Component, attr::Symbol, axes...) = WrappedArray(get(c, attr), axes.
 
 Base.getindex(c::Component, attr::Symbol) = get(c, attr)
 
+getjump(m::EnergyModel, c::Component, attr::Symbol) = getjump(m, c.class, attr)
 function getjump(m::EnergyModel, class::Symbol, attr::Symbol)
     ret = get(get!(m.jumpobjects, class, Dict{Symbol}{Any}()), attr, nothing)
-    (!isnothing(ret) || isnothing(m.parent)) ? ret : getjump(m.parent, class, attr)
+    if !isnothing(ret)
+        AxisArray(ret)
+    elseif !isnothing(m.parent)
+        getjump(m.parent, class, attr)
+    else
+        nothing
+    end
 end
-getjump(c::Component, attr::Symbol) = getjump(model(c), c.class, attr)
+getjump(c::Component, attr::Symbol) = getjump(model(c), c, attr)
 JuMP.getvalue(c::Component, attr::Symbol) = getvalue.(getjump(c, attr))
 JuMP.getdual(c::Component, attr::Symbol) = getdual.(getjump(c, attr))
 getparam(c::Component, attr::Symbol) = get(model(c).data, c, attr)

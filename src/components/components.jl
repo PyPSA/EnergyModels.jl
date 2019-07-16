@@ -34,9 +34,9 @@ abstract type OnePort{DF<:DeviceFormulation} <: Device{DF} end
 busattributes(d::OnePort) = (:bus,)
 
 ## Defaults for OnePort
-cost(d::OnePort) = sum(d[:marginal_cost] .* AxisArray(d[:p])) + sum(d[:capital_cost] .* (AxisArray(d[:p_nom]) .- getparam(d, :p_nom)))
+cost(d::OnePort) = sum(d[:marginal_cost] .* d[:p]) + sum(d[:capital_cost] .* (d[:p_nom] .- getparam(d, :p_nom)))
 function p(d::OnePort)
-    p = AxisArray(d[:p])
+    p = d[:p]
     ((o,t)->p[o,t],)
 end
 
@@ -54,7 +54,7 @@ abstract type ActiveBranch{DF<:DeviceFormulation} <: Branch{DF} end
 
 busattributes(d::Branch) = (:bus0, :bus1)
 function p(d::Branch)
-    p = AxisArray(d[:p])
+    p = d[:p]
     ((b,t)->p[b,t],   # :bus0
      (b,t)->-p[b,t])  # :bus1
 end

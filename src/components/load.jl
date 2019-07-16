@@ -3,7 +3,7 @@
 
 cost(d::Load) = 0.
 function p(d::Load)
-    p = AxisArray(d[:p_set])
+    p = get(d, :p_set, axis(d), axis(d, :snapshots))
     ((l,t)->-p[l,t],)
 end
 addto!(jm::JuMP.AbstractModel, m::EnergyModel, d::Load) = nothing

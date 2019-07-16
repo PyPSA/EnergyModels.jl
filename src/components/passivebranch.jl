@@ -1,7 +1,7 @@
 # PassiveBranch
 abstract type PassiveBranch{DF<:DeviceFormulation} <: Branch{DF} end
 
-cost(d::PassiveBranch) = sum(d[:capital_cost] .* (AxisArray(d[:s_nom]) .- getparam(d, :s_nom)))
+cost(d::PassiveBranch) = sum(d[:capital_cost] .* (d[:s_nom] .- getparam(d, :s_nom)))
 
 # Split lines into AC and DC?
 @adddevice(Line, PassiveBranch, :lines, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "lines.csv"))
@@ -33,7 +33,7 @@ function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where
     L = axis(m, d)
     T = axis(m, :snapshots)
 
-    s_nom = get(d, :s_nom)
+    s_nom = get(d, :s_nom, L)
     s_max_pu = get(d, :s_max_pu, L, T)
 
     @variable(jm, p[L,T])
@@ -50,7 +50,7 @@ function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where {DF <
     L = axis(m, d)
     T = axis(m, :snapshots)
 
-    s_nom = get(d, :s_nom)
+    s_nom = get(d, :s_nom, L)
     s_max_pu = get(d, :s_max_pu, L, T)
 
     @variable(jm, - s_max_pu[l,t] * s_nom[l] <= p[l=L,t=T] <= s_max_pu[l,t] * s_nom[l])

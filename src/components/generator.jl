@@ -22,7 +22,7 @@ function addto!(jm::ModelView, m::EnergyModel{MT,TF}, d::Generator{DF}) where
     G = axis(m, d)
     T = axis(m, :snapshots)
 
-    p_nom = get(d, :p_nom)
+    p_nom = get(d, :p_nom, G)
     p_min_pu = get(d, :p_min_pu, G, T)
     p_max_pu = get(d, :p_max_pu, G, T)
 
