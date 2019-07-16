@@ -43,7 +43,7 @@ function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
                        Dict{Symbol, Dict{Symbol}{Any}}())
 end
 
-EnergyModel(filename::String; kwargs...) = EnergyModel(load(filename); kwargs...)
+EnergyModel(filename; kwargs...) = EnergyModel(load(filename); kwargs...)
 EnergyModel(data::AbstractData; kwargs...) = load(EnergyModel(ExpansionModel, PM.DCPlosslessForm, data; kwargs...))
 
 function load(m::EnergyModel)
