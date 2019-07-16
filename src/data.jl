@@ -2,10 +2,10 @@ using NCDatasets
 
 abstract type AbstractNcData <: AbstractData end
 
-function gettypeparams end
-function components end
+gettypeparams(data::AbstractData, c::Component) = nothing
+axis(data::AbstractData, c::Component) = axis(data, naming(c))
 
-include("data/pypsa.jl")
+function components end
 
 struct NcData <: AbstractNcData
     dataset::Dataset
@@ -69,6 +69,7 @@ function collectaxes(components; kwargs...)
             axname = axisname(ax)
             if haskey(axdict, axname)
                 @assert axdict[axname] == ax
+                # TODO the assert does not provide enough information to fix the problem!
             else
                 axdict[axname] = ax
             end
@@ -95,18 +96,26 @@ function axis(data::Data{<:AbstractData}, n::Symbol)
     !isnothing(ret) ? ret : axis(data.fallback, n)
 end
 axis(data::Data{Nothing}, n::Symbol) = data.axes[n]
-axis(data::AbstractData, c::Component) = axis(data, naming(c))
 
-Base.get(data::Data{Nothing}, c::Component, quantity) = data.components[naming(c)].data[quantity]
+function Base.get(data::Data{Nothing}, c::Component, quantity)
+    ret = get(data.components[naming(c)].data, quantity, nothing)
+    !isnothing(ret) ? ret : getdefault(c, quantity)
+end
 function Base.get(data::Data{<:AbstractData}, c::Component, quantity)
     componentdesc = get(data.components, naming(c), nothing)
     if !isnothing(componentdesc)
         ret = get(componentdesc.data, quantity, nothing)
-        !isnothing(ret) ? ret : get(data.fallback, c, quantity)
+        if isnothing(ret)
+            ret = get(data.fallback, c, quantity)
+        end
     else
-        get(data.fallback, c, quantity)
+        ret = get(data.fallback, c, quantity)
     end
+
+    !isnothing(ret) ? ret : getdefault(c, quantity)
 end
 
-gettypeparams(data::Data{Nothing}, device::Device) = error("Not implemented yet")
+gettypeparams(data::Data{Nothing}, device::Device) = nothing
 gettypeparams(data::Data{<:AbstractData}, device::Device) = gettypeparams(data.fallback, device)
+
+include("data/pypsa.jl")
