@@ -43,6 +43,7 @@ function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
                        Dict{Symbol, Dict{Symbol}{Any}}())
 end
 
+EnergyModel(; kwargs...) = EnergyModel(Data(); kwargs...)
 EnergyModel(filename; kwargs...) = EnergyModel(load(filename); kwargs...)
 EnergyModel(data::AbstractData; kwargs...) = load(EnergyModel(ExpansionModel, PM.DCPlosslessForm, data; kwargs...))
 
@@ -92,11 +93,11 @@ function Base.getindex(m::EnergyModel, class::Symbol)
     end
     throw(KeyError(class))
 end
-Base.getindex(m::EnergyModel, T::Type{<:Device}) = ContainerView(m, Dict(d.class=>d for d=devices(m, T)))
-Base.getindex(m::EnergyModel, ::Type{Bus}) = ContainerView(m, Dict(d.class=>d for d=buses(m)))
+Base.getindex(m::EnergyModel, ::Type{T}) where T <: Device = ContainerView(m, Dict{Symbol,T}(d.class=>d for d=devices(m, T)))
+Base.getindex(m::EnergyModel, ::Type{Bus}) = ContainerView(m, Dict{Symbol,Bus}(d.class=>d for d=buses(m)))
 
-Base.getindex(sn::SubNetwork, T::Type{<:Device}) = SubContainerView(model(sn), Dict(d.class=>d for d=devices(sn, T)), sn.buses)
-Base.getindex(sn::SubNetwork, ::Type{Bus}) = SubContainerView(model(sn), Dict(d.class=>d for d=buses(model(sn))), sn.buses)
+Base.getindex(sn::SubNetwork, ::Type{T}) where T <: Device = SubContainerView(model(sn), Dict{Symbol,T}(d.class=>d for d=devices(sn, T)), sn.buses)
+Base.getindex(sn::SubNetwork, ::Type{Bus}) = SubContainerView(model(sn), Dict{Symbol,Bus}(d.class=>d for d=buses(model(sn))), sn.buses)
 
 """
     Base.get(c::Component, attr::Symbol)
@@ -161,3 +162,8 @@ axis(m::SubNetwork, T::Type{<:Component}) = axis(m[T])
 # Could be specialized to not have to retrieve the whole axis (on the other
 # hand, the axis should be cached, anyway)
 Base.length(c::Component) = length(axis(c))
+
+function add!(m::EnergyModel, ::Type{T}, class::Symbol; parameters...) where T <: Component
+    push!(m.data, class, T; parameters...)
+    push!(m, T(m, class))
+end

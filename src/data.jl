@@ -55,36 +55,47 @@ struct Data{T} <: AbstractData
     components::Dict{Symbol,ComponentDesc}
     axes::Dict{Symbol,Axis}
     fallback::T
+
+    function Data(components::Dict{Symbol,ComponentDesc}, fallback::Union{Nothing,AbstractData})
+        data = new{typeof(fallback)}(components, Dict{Symbol,Axis}(), fallback)
+        for cd in values(data.components)
+            pushaxes!(data, cd)
+        end
+        data
+    end
+end
+Data(; components=Dict{Symbol,ComponentDesc}(), fallback=nothing) = Data(components, fallback)
+Data(components::Vector{ComponentDesc}; fallback=nothing) = Data(Dict(cd.name => cd for cd in components), fallback)
+Data(components::Vararg{Tuple{Symbol,Any,Dict{Symbol,AxisArray}}}; kwargs...) = Data(ComponentDesc.(components); kwargs...)
+
+function pushaxes!(data::AbstractData, ax::Axis; component="unknown", attribute="unknown")
+    ## Duck-typing since we want to use this function for PypsaNcData as well
+    axname = axisname(ax)
+    if haskey(data.axes, axname)
+        if data.axes[axname] != ax
+            error("Incompatible axes: The $attribute attribute of component $component has the axis $axname, which we previously encountered with different values:\n\t$(data.axes[axname]) != $ax (previous != new)")
+        end
+    else
+        data.axes[axname] = ax
+    end
 end
 
-Data(; components=Dict{Symbol,ComponentDesc}(), axes=Dict{Symbol,Axis}(), fallback=nothing) = Data(components, axes, fallback)
-
-AxisArrays.axes(cd::ComponentDesc) =
-    Iterators.flatten(AxisArrays.axes(attr) for attr in values(cd.data))
-
-function collectaxes(components; kwargs...)
-    axdict = Dict{Symbol, Axis}()
-    for cd in components
-        for ax in AxisArrays.axes(cd; kwargs...)
-            axname = axisname(ax)
-            if haskey(axdict, axname)
-                @assert axdict[axname] == ax
-                # TODO the assert does not provide enough information to fix the problem!
-            else
-                axdict[axname] = ax
-            end
+function pushaxes!(data::Data, cd::ComponentDesc)
+    for (name, attr) in cd.data
+        for ax in AxisArrays.axes(attr)
+            pushaxes!(data, ax, component=cd.name, attribute=name)
         end
     end
-    axdict
 end
 
-Data(components::Vararg{Tuple{Symbol,Any,Dict{Symbol,AxisArray}}}; kwargs...) = Data(ComponentDesc.(components); kwargs...)
-function Data(components::Vector{ComponentDesc}; fallback=nothing)
-    compdict = Dict(cd.name => cd for cd in components)
-    axdict = collectaxes(components)
-
-    Data(compdict, axdict, fallback)
+function Base.push!(data::Data, cd::ComponentDesc)
+    data.components[cd.name] = cd
+    pushaxes!(data, cd)
 end
+
+Base.push!(data::Data, name::Symbol, ::Type{T}; parameters...) where T <: Component =
+    push!(data, ComponentDesc(name, T, Dict(parameters)))
+
 
 _components(data) = map(cd->(cd.name => cd.componenttype), values(data.components))
 components(data::Data{Nothing}) = _components(data)

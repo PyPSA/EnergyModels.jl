@@ -26,8 +26,8 @@ devices(cv::AbstractContainerView, T::Type{<:Device}) = (c for c = devices(cv) i
 axis(cv::AbstractContainerView) = _viewaxis(cv, vcat((_maybesubset(cv, c, tupleaxisvals(c)) for c = devices(cv))...))
 axis(cv::AbstractContainerView, T::Type{<:Component}) = axis(m[T])
 
-Base.cat(cv::AbstractContainerView, cs::Vector{<:Component}, as::Vector) = @consense(as, "Single values do not agree")
-function Base.cat(cv::AbstractContainerView, cs::Vector{<:Component}, as::Vector{<:AxisArray})
+# Base.cat(cv::AbstractContainerView, cs::Vector{<:Component}, as::Vector) = @consense(as, "Single values do not agree")
+function Base.cat(cv::AbstractContainerView, cs::Vector{<:Component}, as::Vector)
     _viewaxisarray(c, a) = AxisArray(a, _viewaxis(cv, tupleaxisvals(c, first(AxisArrays.axes(a)))))
     cat((_viewaxisarray(c, _maybesubset(cv, c, a)) for (c, a) = zip(cs, as))...; dims=1)
 end

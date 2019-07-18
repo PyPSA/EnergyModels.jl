@@ -9,8 +9,8 @@ using ..EnergyModels
 const EM = EnergyModels
 
 using ..EnergyModels:
-    AbstractNcData, resolve, @consense, Component, Device, DeviceFormulation,
-    attributes, components, typenames, naming
+    AbstractNcData, pushaxes!, resolve, @consense, Component, Device,
+    DeviceFormulation, attributes, components, typenames, naming
 
 export PypsaNcData
 
@@ -38,6 +38,20 @@ struct ComponentDesc
     typeparams::Union{Nothing,Dict{Symbol,Any}}
 end
 
+struct PypsaNcData <: AbstractNcData
+    dataset::Dataset
+    components::Dict{Symbol}{ComponentDesc}
+    axes::Dict{Symbol}{Axis}
+
+    function PypsaNcData(dataset, components)
+        data = new(dataset, components, Dict{Symbol}{Axis}())
+        for cd in values(data.components)
+            pushaxes!(data, cd)
+        end
+        data
+    end
+end
+
 """
     _dimnames(::PypsaNcData, ::AbstractAttrDesc)
 
@@ -46,15 +60,13 @@ returns tuples for the dimensions EXCEPT for the main component axis.
 _dimnames(attrdesc::AbstractAttrDesc; ds=nothing) = ()
 _dimnames(attrdesc::AttrDesc; ds=nothing) = dimnames(ds[attrdesc.pypsaname])[2:end]
 
-function AxisArrays.axes(cd::ComponentDesc; ds=nothing)
-    dims = unique(Iterators.flatten((_dimnames(attrdesc; ds=ds) for attrdesc in values(cd.attributes))))
-    (cd.axis, (Axis{Symbol(n)}(nomissing(ds[n][:])) for n = dims)...)
-end
+function EM.pushaxes!(data::PypsaNcData, cd::ComponentDesc)
+    pushaxes!(data, cd.axis, component=cd.name, attribute="primary")
 
-struct PypsaNcData <: AbstractNcData
-    dataset::Dataset
-    components::Dict{Symbol}{ComponentDesc}
-    axes::Dict{Symbol}{Axis}
+    dims = unique(Iterators.flatten((_dimnames(attrdesc; ds=data.dataset) for attrdesc in values(cd.attributes))))
+    for dim in dims
+        pushaxes!(data, Axis{Symbol(dim)}(nomissing(data.dataset[dim][:])), component=cd.name, attribute=dim)
+    end
 end
 
 _getattr(ds, pypsaname, attr) =
@@ -155,8 +167,7 @@ function PypsaNcData(ds)
     )
 
     compdict = Dict(cd.name => cd for cd in components)
-    axdict = EM.collectaxes(components; ds=ds)
-    PypsaNcData(ds, compdict, axdict)
+    PypsaNcData(ds, compdict)
 end
 
 function _maybe_as_range(x::AbstractArray{T,1}) where T<:Number
