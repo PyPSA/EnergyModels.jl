@@ -67,16 +67,16 @@ _getattrpair(ds, pypsaname, attr::DataFrame) = ((col,)=names(df); col=>attr[col]
 splitgroup(df, group) = [group]
 splitgroup(df, group, pair::Pair, attrs...) = splitgroup(df, group, pair.first, attrs...; usename=x->pair.second[x ? 1 : 2])
 function splitgroup(df, group, attr, attrs...; usename=identity)
-    gdf = groupby(DataFrame(attr=>df[attr][group.idx], :idx=>group.idx, copycols=false), attr);
+    gdf = groupby(DataFrame(attr=>df[group.idx,attr], :idx=>group.idx, copycols=false), attr);
 
     if length(gdf) == 1
-        ng = attr == :carrier ? (idx=group.idx, name=(group.name..., usename(first(parent(gdf)[attr])))) : group
+        ng = attr == :carrier ? (idx=group.idx, name=(group.name..., usename(first(parent(gdf)[!,attr])))) : group
         groups = splitgroup(df, ng, attrs...)
     else
         groups = Any[]
         for sdf in gdf
             ng = (idx=collect(sdf.idx),
-                  name=(group.name..., usename(first(sdf[attr]))))
+                  name=(group.name..., usename(first(sdf[!,attr]))))
             append!(groups, splitgroup(df, ng, attrs...))
         end
     end
@@ -133,7 +133,7 @@ function typeparamdescriptions(name, ds, listname, indices; types=nothing)
     typefield = string(listname, "_type")
     if types === nothing || !haskey(ds, typefield) return nothing end
     typename = @consense(ds[typefield][:][indices], "$name may not have more than one type")
-    typ = types[types[:name] .== typename, :]
+    typ = types[types.name .== typename, :]
     Dict(c => typ[1, c] for c = names(typ) if c != :name)
 end
 
@@ -215,11 +215,11 @@ function getcomponents(ds, name; pypsaname=false, withname=true, carrier=true, e
 
     componenttypeunion = resolve(Component, name)
     componentattributes = copy(attributes(componenttypeunion))
-    componentattributes = componentattributes[componentattributes[:quantitytype] .!= "Variable", :]
-    componentattributes[:PyPSA] = string.(componentattributes[:attribute])
-    componentattributes[:dimensions] = recode(length.(componentattributes[:dimensions]),
-                                              0=>:single, 1=>:static, 2=>:series,
-                                              3:20=>missing)
+    componentattributes = componentattributes[componentattributes.quantitytype .!= "Variable", :]
+    componentattributes.PyPSA = string.(componentattributes.attribute)
+    componentattributes.dimensions = recode(length.(componentattributes.dimensions),
+                                            0=>:single, 1=>:static, 2=>:series,
+                                            3:20=>missing)
 
     for g in splitintogroups(ds, pypsaname, attrs...; initialname=initialname)
         axis = Axis{g.name}(nomissing(ds[pypsaname * "_i"][:][g.idx]))
