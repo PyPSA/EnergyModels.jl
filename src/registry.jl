@@ -41,8 +41,13 @@ end
 
 function naming(::Type{T}) where T <: Component
     j = findfirst(cd -> cd.componenttype == T, componentdescriptions)
-    !isnothing(j) && return componentdescriptions[j]
+    !isnothing(j) && return componentdescriptions[j].name
 
-    s = lowercase(string(T.name.name))
+    S = T
+    while S isa UnionAll
+        S = S.body
+    end
+
+    s = lowercase(string(S.name.name))
     Symbol(s, in(s[end], ('s', 'h')) ? "es" : "s")
 end
