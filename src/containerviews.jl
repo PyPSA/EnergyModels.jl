@@ -34,8 +34,7 @@ end
 
 mapcat(f::Function, cv::AbstractContainerView) = cat(cv, collect(devices(cv)), map(f, devices(cv)))
 
-# TODO The AxisArray that is spliced in here is a mild hack!
-Base.get(cv::AbstractContainerView, i) = mapcat(c->AxisArray(get(c, i)), cv)
+Base.get(cv::AbstractContainerView, i) = mapcat(c->get(c, i), cv)
 Base.get(cv::AbstractContainerView, i, axes...) = WrappedArray(get(cv, i), axes...)
 
 Base.getindex(cv::AbstractContainerView, i) = get(cv, i)
