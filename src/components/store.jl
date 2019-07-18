@@ -1,5 +1,6 @@
 ## Store
-@adddevice(Store, OnePort, :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "attrs", "stores.csv"))
+@adddevice(Store, OnePort, LinearExpansionForm{LinearDispatchForm},
+           :stores, (:S, :T=>:snapshots), joinpath(@__DIR__, "attrs", "stores.csv"))
 
 cost(d::Store) = sum(d[:marginal_cost] .* d[:p]) + sum(d[:capital_cost] .* (d[:e_nom] - getparam(d, :e_nom)))
 

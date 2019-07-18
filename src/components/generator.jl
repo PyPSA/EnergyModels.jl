@@ -1,6 +1,6 @@
 ## Generator
-@adddevice(Generator, OnePort, :generators,
-           (:G, :T=>:snapshots), joinpath(@__DIR__, "attrs", "generators.csv"))
+@adddevice(Generator, OnePort, LinearExpansionForm{LinearDispatchForm},
+           :generators, (:G, :T=>:snapshots), joinpath(@__DIR__, "attrs", "generators.csv"))
 
 function addto!(jm::ModelView, m::EnergyModel, d::Generator{DF}) where {DDF, DF <: LinearExpansionForm{DDF}}
     addto!(jm, m, with_formulation(d, LinearExpansionInvestmentForm))

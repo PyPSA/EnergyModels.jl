@@ -4,9 +4,11 @@ abstract type PassiveBranch{DF<:DeviceFormulation} <: Branch{DF} end
 cost(d::PassiveBranch) = sum(d[:capital_cost] .* (d[:s_nom] .- getparam(d, :s_nom)))
 
 # Split lines into AC and DC?
-@adddevice(Line, PassiveBranch, :lines, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "lines.csv"))
+@adddevice(Line, PassiveBranch, LinearExpansionForm{LinearDispatchForm},
+           :lines, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "lines.csv"))
 
-@adddevice(Transformer, PassiveBranch, :transformers, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "transformers.csv"))
+@adddevice(Transformer, PassiveBranch, LinearExpansionForm{LinearDispatchForm},
+           :transformers, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "transformers.csv"))
 
 function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where
       {DDF, DF <: LinearExpansionForm{DDF}}

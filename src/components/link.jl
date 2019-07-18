@@ -1,6 +1,7 @@
 ## Link
 
-@adddevice(Link, ActiveBranch, :links, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "links.csv"))
+@adddevice(Link, ActiveBranch, LinearExpansionForm{LinearDispatchForm},
+           :links, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "links.csv"))
 
 function p(d::Link)
     p = d[:p]

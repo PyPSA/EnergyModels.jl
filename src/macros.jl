@@ -7,14 +7,18 @@ macro consense(x, msgs...)
     end
 end
 
-macro adddevice(type, abstype, name, axes, file)
+macro adddevice(type, abstype, defaultformulation, name, axes, file)
     type = esc(type)
     abstype = esc(abstype)
+    defaultformulation = esc(defaultformulation)
     quote
         struct $type{DF<:DeviceFormulation} <: $abstype{DF}
             model::EnergyModel
             class::Symbol
         end
+        # Fall back to default formulation
+        $type(model, class) = $type{$defaultformulation}(model, class)
+        # Allow changing device formulation
         $type{DF}(d::$type) where DF = $type{DF}(d.model, d.class)
         $type{DF}(d::$type, ::Type{NewDF}) where {DF <: DeviceFormulation, NewDF <: DeviceFormulation} = $type{NewDF}(d)
 

@@ -230,9 +230,8 @@ function getcomponents(ds, name; pypsaname=false, withname=true, carrier=true, e
         ]), "_")
 
         componenttype =
-            if componenttypeunion <: Device
-                formulation = isempty(formulation) ? DeviceFormulation : resolve(DeviceFormulation, Symbol(formulation))
-                componenttypeunion{formulation}
+            if componenttypeunion <: Device && !isempty(formulation)
+                componenttypeunion{resolve(DeviceFormulation, Symbol(formulation))}
             else
                 componenttypeunion
             end

@@ -1,4 +1,5 @@
-@adddevice(StorageUnit, OnePort, :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "attrs", "storageunits.csv"))
+@adddevice(StorageUnit, OnePort, LinearExpansionForm{LinearDispatchForm},
+           :storageunits, (:S, :T=>:snapshots), joinpath(@__DIR__, "attrs", "storageunits.csv"))
 
 ## StorageUnit
 cost(d::StorageUnit) = sum(d[:marginal_cost] .* d[:p_dispatch]) + sum(d[:capital_cost] .* (d[:p_nom] - getparam(d, :p_nom)))

@@ -1,5 +1,5 @@
 ## Load
-@adddevice(Load, OnePort, :loads, (:L,), joinpath(@__DIR__, "attrs", "loads.csv"))
+@adddevice(Load, OnePort, LinearDispatchForm, :loads, (:L,), joinpath(@__DIR__, "attrs", "loads.csv"))
 
 cost(d::Load) = 0.
 function p(d::Load)
