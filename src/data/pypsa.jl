@@ -69,46 +69,28 @@ function EM.pushaxes!(data::PypsaNcData, cd::ComponentDesc)
     end
 end
 
-_getattr(ds, pypsaname, attr) =
-    haskey(ds, attr) ? nomissing(ds[attr][:]) : Array{Union{Float64,Missing}}(missing, length(ds[string(pypsaname, "_i")]))
-
-_getattrpair(ds, pypsaname, attr) = attr => _getattr(ds, pypsaname, string(pypsaname, "_", attr))
-_getattrpair(ds, pypsaname, attr::Pair) = _getattrpair(ds, pypsaname, attr.first)
-_getattrpair(ds, pypsaname, attr::DataFrame) = ((col,)=names(df); col=>attr[col])
+function _getattr(ds, pypsaname, attr)
+    fullname = string(pypsaname, "_", attr)
+    haskey(ds, fullname) ? nomissing(ds[fullname][:]) : Array{Union{Float64,Missing}}(missing, length(ds[string(pypsaname, "_i")]))
+end
 
 splitgroup(df, group) = [group]
-splitgroup(df, group, pair::Pair, attrs...) = splitgroup(df, group, pair.first, attrs...; usename=x->pair.second[x ? 1 : 2])
-function splitgroup(df, group, attr, attrs...; usename=identity)
+function splitgroup(df, group, attr, attrs...)
     gdf = groupby(DataFrame(attr=>df[group.idx,attr], :idx=>group.idx, copycols=false), attr);
 
     if length(gdf) == 1
-        ng = attr == :carrier ? (idx=group.idx, name=(group.name..., usename(first(parent(gdf)[!,attr])))) : group
+        ng = attr == :carrier ? (idx=group.idx, name=(group.name..., first(parent(gdf)[!,attr]))) : group
         groups = splitgroup(df, ng, attrs...)
     else
         groups = Any[]
         for sdf in gdf
             ng = (idx=collect(sdf.idx),
-                  name=(group.name..., usename(first(sdf[!,attr]))))
+                  name=(group.name..., first(sdf[!,attr])))
             append!(groups, splitgroup(df, ng, attrs...))
         end
     end
 
     groups
-end
-
-function splitintogroups(ds, pypsaname, attrs...; initialname=())
-    df = DataFrame((_getattrpair(ds, pypsaname, attr) for attr in attrs)...,
-                   copycols=false)
-    if isempty(df)
-        [(idx=1:size(ds[string(pypsaname, "_i")], 1),
-          name=Symbol(join(skipmissing(initialname), "_")),
-          attrs=Dict{Symbol}{Any}())]
-    else
-        [(idx=_maybe_as_range(group.idx),
-          name=Symbol(join(skipmissing(group.name), "_")),
-          attrs=Dict(pairs(df[first(group.idx),:])...))
-         for group in splitgroup(df, (idx=1:size(df, 1), name=initialname), attrs...)]
-    end
 end
 
 AttrDesc(::Type{Val{:single}}, attr, name, ds, attrname, attrname_t, idx, axis) =
@@ -188,7 +170,7 @@ getcarrier(ds, buses_carrier, pypsaname, busattrs::Tuple) =
     _join.((getcarrier(ds, buses_carrier, pypsaname, busattr) for busattr in busattrs)...)
 function getcarrier(ds, pypsaname, busattrs)
     buses_carrier = Dict(nomissing(ds["buses_i"][:]) .=> nomissing(ds["buses_carrier"][:]))
-    DataFrame(carrier=getcarrier(ds, buses_carrier, pypsaname, busattrs))
+    getcarrier(ds, buses_carrier, pypsaname, busattrs)
 end
 
 _length(carrier) = 1
@@ -207,19 +189,25 @@ function getcomponents(ds, name; pypsaname=false, withname=true, carrier=true, e
 
     initialname = withname ? (name,) : ()
 
-    attrs = []
+    df = DataFrame()
     if carrier === true
-        push!(attrs, :carrier)
+        df[!, :carrier] = _getattr(ds, pypsaname, :carrier)
     elseif carrier !== false
         if "buses_carrier" in ds
-            push!(attrs, getcarrier(ds, carrier))
+            df[!, :carrier] = getcarrier(ds, pypsaname, carrier)
         else
             initialname = (initialname..., join(repeat(["AC"], _length(carrier)), "_"))
         end
     end
 
-    if exp !== false push!(attrs, exp => (:ext, :fix)) end
-    if uc !== false push!(attrs, uc => (:uc, :lin)) end
+    if exp !== false
+        df[!, exp] = recode(_getattr(ds, pypsaname, exp),
+                            0=>:fix, false=>:fix, 1=>:ext, true=>:ext)
+    end
+    if uc !== false
+        df[!, uc] = recode(_getattr(ds, pypsaname, uc),
+                           0=>:lin, false=>:lin, 1=>:uc, true=>:uc)
+    end
 
     typesfn = joinpath(@__DIR__, string("pypsa.", pypsaname, ".types.csv"))
     types = isfile(typesfn) ? CSV.read(typesfn) : nothing
@@ -227,17 +215,40 @@ function getcomponents(ds, name; pypsaname=false, withname=true, carrier=true, e
     componenttypeunion = resolve(Component, name)
     componentattributes = copy(attributes(componenttypeunion))
     componentattributes = componentattributes[componentattributes.quantitytype .!= "Variable", :]
-    componentattributes.PyPSA = string.(componentattributes.attribute)
-    componentattributes.dimensions = recode(length.(componentattributes.dimensions),
-                                            0=>:single, 1=>:static, 2=>:series,
-                                            3:20=>missing)
+    componentattributes[!, :PyPSA] = string.(componentattributes.attribute)
+    componentattributes[!, :dimensions] = recode(length.(componentattributes.dimensions),
+                                                 0=>:single, 1=>:static, 2=>:series,
+                                                 3:20=>missing)
 
-    for g in splitintogroups(ds, pypsaname, attrs...; initialname=initialname)
+    idx = nomissing(ds[pypsaname * "_i"][:])
+    timeattrs = componentattributes[componentattributes.dimensions .== :series, :attribute]
+    for timeattr in timeattrs
+        timeidx = string(pypsaname, "_t_", timeattr, "_i")
+        if haskey(ds, timeidx)
+            label = Symbol(:t_, timeattr)
+            df[!, label] = recode(in.(idx, Ref(nomissing(ds[timeidx][:]))),
+                                  false=>missing, true=>label)
+        end
+    end
+
+    groups =
+        if isempty(df)
+            [(idx=1:size(idx, 1),
+              name=Symbol(join(skipmissing(initialname), "_")),
+              attrs=Dict{Symbol}{Any}())]
+        else
+            [(idx=_maybe_as_range(group.idx),
+              name=Symbol(join(skipmissing(group.name), "_")),
+              attrs=Dict(pairs(df[first(group.idx),:])...))
+            for group in splitgroup(df, (idx=1:size(df, 1), name=initialname), names(df)...)]
+        end
+
+    for g in groups
         axis = Axis{g.name}(nomissing(ds[pypsaname * "_i"][:][g.idx]))
 
         formulation = join(skipmissing([
-            exp !== false ? (Bool(coalesce(g.attrs[exp], false)) ? "linexp" : missing) : missing,
-            uc !== false ?  (Bool(coalesce(g.attrs[uc], false))  ? "ucdisp" : "lindisp") : "lindisp"
+            exp !== false ? ((coalesce(g.attrs[exp], :fix) == :ext) ? "linexp" : missing) : missing,
+            uc !== false ?  ((coalesce(g.attrs[uc], :lin) == :uc)   ? "ucdisp" : "lindisp") : "lindisp"
         ]), "_")
 
         componenttype =
