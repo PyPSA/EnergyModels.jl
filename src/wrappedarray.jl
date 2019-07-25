@@ -7,7 +7,7 @@ struct WrappedArray{T,N,M,D,Ax} <: AbstractArray{T,N}
     data::D
     axes::Ax
     # Duck-typing, we assume axisnames is defined for data
-    function WrappedArray(data::T, axes::NTuple{N,Axis}) where {T<:Number, N}
+    function WrappedArray(data::T, axes::NTuple{N,Axis}) where {T<:Union{Number,Symbol}, N}
         new{T,N,0,T,typeof(axes)}(data, axes)
     end
     function WrappedArray(data::ArrayTypes{T,M}, axes::NTuple{N,Axis}) where {T,N,M}

@@ -170,7 +170,13 @@ axis(m::SubNetwork, T::Type{<:Component}) = axis(m[T])
 # hand, the axis should be cached, anyway)
 Base.length(c::Component) = length(axis(c))
 
-function add!(m::EnergyModel, ::Type{T}, class::Symbol; parameters...) where T <: Component
-    push!(m.data, class, T; parameters...)
+add!(m::EnergyModel, ::Type{T}, class::Symbol; kwargs...) where T <: Component = add!(m, T, Axis{class}([class]); kwargs...)
+add!(m::EnergyModel, ::Type{T}, class::Symbol, names; kwargs...) where T <: Component = add!(m, T, Axis{class}(names); kwargs...)
+function add!(m::EnergyModel, ::Type{T}, ax::Axis{class}; suffix=nothing, parameters...) where {class, T <: Component}
+    if !isnothing(suffix)
+        ax = Axis{class}(Symbol.(ax.val, suffix))
+    end
+
+    push!(m.data, T, ax; parameters...)
     push!(m, T(m, class))
 end

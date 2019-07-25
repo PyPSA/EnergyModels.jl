@@ -47,7 +47,7 @@ axis(data::AbstractNcData, n::Symbol) = Axis{n}(nomissing(data.dataset[String(n)
 struct ComponentDesc
     name::Symbol
     componenttype
-    data::Dict{Symbol,AxisArray}
+    data::Dict{Symbol,Union{Symbol,Float64,AxisArray}}
 end
 ComponentDesc(tup) = ComponentDesc(tup...)
 
@@ -66,14 +66,14 @@ struct Data{T} <: AbstractData
 end
 Data(; components=Dict{Symbol,ComponentDesc}(), fallback=nothing) = Data(components, fallback)
 Data(components::Vector{ComponentDesc}; fallback=nothing) = Data(Dict(cd.name => cd for cd in components), fallback)
-Data(components::Vararg{Tuple{Symbol,Any,Dict{Symbol,AxisArray}}}; kwargs...) = Data(ComponentDesc.(components); kwargs...)
+Data(components::Vararg{Tuple{Symbol,Any,Dict{Symbol}}}; kwargs...) = Data(ComponentDesc.(components); kwargs...)
 
 function pushaxes!(data::AbstractData, ax::Axis; component="unknown", attribute="unknown")
-    ## Duck-typing since we want to use this function for PypsaNcData as well
+    ## Duck-typing on that data has an `axes` dictionary since we want to use this function for PypsaNcData as well
     axname = axisname(ax)
     if haskey(data.axes, axname)
         if data.axes[axname] != ax
-            error("Incompatible axes: The $attribute attribute of component $component has the axis $axname, which we previously encountered with different values:\n\t$(data.axes[axname]) != $ax (previous != new)")
+            error("Incompatible axes: The $attribute attribute of component $component has the axis $axname, which we previously encountered with different values:\n\t$(data.axes[axname].val) != $(ax.val) (previous != new)")
         end
     else
         data.axes[axname] = ax
@@ -82,19 +82,29 @@ end
 
 function pushaxes!(data::Data, cd::ComponentDesc)
     for (name, attr) in cd.data
-        for ax in AxisArrays.axes(attr)
-            pushaxes!(data, ax, component=cd.name, attribute=name)
+        if isa(attr, AxisArray)
+            for ax in AxisArrays.axes(attr)
+                pushaxes!(data, ax, component=cd.name, attribute=name)
+            end
+        else
+            pushaxes!(data, Axis{name}([name]), component=cd.name, attribute=name)
         end
     end
 end
 
-function Base.push!(data::Data, cd::ComponentDesc)
+Base.push!(data::Data, cd, ax::Axis{name}) where name = push!(data, cd, Axis{name}(Symbol.(ax.val)))
+function Base.push!(data::Data, cd::ComponentDesc, ax::Axis{name,Array{Symbol,1}}) where name
+    if name != cd.name
+        @warn "Renaming principal axis $(AxisArrays.axisname(ax)) to $(cd.name)"
+        ax = Axis{cd.name}(ax.val)
+    end
     data.components[cd.name] = cd
+    data.axes[cd.name] = ax # We overwrite, since we overwrite the component as well
     pushaxes!(data, cd)
 end
 
-Base.push!(data::Data, name::Symbol, ::Type{T}; parameters...) where T <: Component =
-    push!(data, ComponentDesc(name, T, Dict(parameters)))
+Base.push!(data::Data, ::Type{T}, ax::Axis{name}; parameters...) where {name,T <: Component} =
+    push!(data, ComponentDesc(name, T, Dict(parameters)), ax)
 
 
 _components(data) = map(cd->(cd.name => cd.componenttype), values(data.components))

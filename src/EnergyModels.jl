@@ -52,7 +52,7 @@ include("containerviews.jl")
 
 include("components/components.jl")
 
-export addto!, build!, optimize!, devices, subnetworks, buses, push!, axis,
+export add!, addto!, build!, optimize!, devices, subnetworks, buses, push!, axis,
     graph, determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual,
     getparam
 
