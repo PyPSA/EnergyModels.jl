@@ -15,6 +15,7 @@ mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <
     devices::Dict{Symbol,Device}
     subnetworks::Dict{Symbol,SubNetwork{EnergyModel{MT,TF}}}
     buses::Dict{Symbol,Bus{EnergyModel{MT,TF}}}
+    axes::Dict{Symbol,Axis}
     data::AbstractData
     parent::Union{AbstractEnergyModel,Nothing}
     jumpmodel::Union{JuMP.AbstractModel,Nothing}
@@ -36,6 +37,7 @@ function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
     EnergyModel{MT,TF}(Dict{Symbol,Device}(),
                        Dict{Symbol,SubNetwork}(),
                        Dict{Symbol,Bus}(),
+                       Dict{Symbol,Axis}(),
                        data,
                        parent,
                        jumpmodel,
@@ -58,6 +60,7 @@ end
 Base.push!(m::EnergyModel, d::Device) = (m.devices[d.class] = d)
 Base.push!(m::EnergyModel, c::SubNetwork) = (m.subnetworks[c.class] = c)
 Base.push!(m::EnergyModel, c::Bus) = (m.buses[c.class] = c)
+Base.push!(m::EnergyModel, ax::Axis{name}) where name = (m.axes[name] = ax)
 
 devices(m::EnergyModel) = values(m.devices)
 devices(sn::SubNetwork) = devices(model(sn))
@@ -152,6 +155,10 @@ JuMP.getvalue(c::Component, attr::Symbol) = getvalue.(getjump(c, attr))
 JuMP.getdual(c::Component, attr::Symbol) = getdual.(getjump(c, attr))
 getparam(c::Component, attr::Symbol) = get(model(c).data, c, attr)
 
+function axis(m::EnergyModel, name::Symbol)
+    ax = get(m.axes, name, nothing)
+    !isnothing(ax) ? ax : axis(m.data, name)
+end
 axis(m::EnergyModel, args...) = axis(m.data, args...)
 axis(c::Component) = axis(model(c), c)
 axis(c::Component, attr) = axis(model(c), attr)
