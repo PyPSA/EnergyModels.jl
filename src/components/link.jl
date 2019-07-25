@@ -3,11 +3,20 @@
 @adddevice(Link, ActiveBranch, LinearExpansionForm{LinearDispatchForm},
            :links, (:L, :T=>:snapshots), joinpath(@__DIR__, "attrs", "links.csv"))
 
-function p(d::Link)
-    p = d[:p]
-    eff = d[:efficiency]
-    ((l,t)->-p[l,t],       # :bus0
-     (l,t)->eff[l]*p[l,t]) # :bus1
+function addtoexpr!(injection::AxisArray, ::NodalActivePower,
+                    m::EnergyModel, d::Link)
+    B, T = AxisArrays.axes(injection)
+    L = axis(m, d)
+
+    bus0 = get(d, :bus0, L)
+    bus1 = get(d, :bus1, L)
+    p = get(d, :p, L, T)
+    eff = get(d, :efficiency, L, T)
+
+    for (i, idx0, idx1) in zip(1:length(L), indexin(bus0, B), indexin(bus1, B)), t in T
+        !isnothing(idx0) && add_to_expression!(injection[idx0,t], -1, p[i,t])
+        !isnothing(idx1) && add_to_expression!(injection[idx1,t], eff[i,t], p[i,t])
+    end
 end
 
 cost(d::Link) = sum(d[:marginal_cost] .* d[:p]) + sum(d[:capital_cost] .* (d[:p_nom] - getparam(d, :p_nom)))

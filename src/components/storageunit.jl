@@ -3,11 +3,22 @@
 
 ## StorageUnit
 cost(d::StorageUnit) = sum(d[:marginal_cost] .* d[:p_dispatch]) + sum(d[:capital_cost] .* (d[:p_nom] - getparam(d, :p_nom)))
-function p(d::StorageUnit)
-    p_dispatch = d[:p_dispatch]
-    p_store = d[:p_store]
 
-    ((s,t)->p_dispatch[s,t] - p_store[s,t],)
+function addtoexpr!(injection::AxisArray, ::NodalActivePower,
+                    m::EnergyModel, d::StorageUnit)
+    B, T = AxisArrays.axes(injection)
+    D = axis(m, d)
+
+    buses = get(d, :bus, D)
+    p_dispatch = get(d, :p_dispatch, D, T)
+    p_store = get(d, :p_store, D, T)
+
+    for (i, idx) in enumerate(indexin(buses, B)), t in T
+        if !isnothing(idx)
+            add_to_expression!(injection[idx,t], p_dispatch[i,t])
+            add_to_expression!(injection[idx,t], -1, p_store[i,t])
+        end
+    end
 end
 
 function addto!(jm::ModelView, m::EnergyModel, d::StorageUnit{DF}) where
