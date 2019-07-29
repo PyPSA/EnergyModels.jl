@@ -88,7 +88,7 @@ function parse(gens::Vector{T}) where T <: PSY.Generator
     :econ in fieldnames(T) && parse!(data, getfield.(gens, :econ), ax)
     :tech in fieldnames(T) && parse!(data, getfield.(gens, :tech), ax)
     rescale!(data, :p_nom, :p_max_pu, :p_min_pu)
-    rescale!(data, :q_nom, :q_max_pu, :q_min_pu)
+    rescale!(data, :p_nom, :q_max_pu, :q_min_pu)
 
     if :scalingfactor in fieldnames(T)
         scalingfactor = parse(getfield.(gens, :scalingfactor), ax)
@@ -113,6 +113,7 @@ end
 
 # Split inhomogeneous device types into separate devices
 function read(devices::Vector{T}) where T <: PSY.Device
+    isempty(devices) && return ComponentDesc[]
     if isconcretetype(T)
         error("Need to implement `read` for PowerSystems device type $T")
     end
@@ -183,7 +184,7 @@ end
 
 function read(sys::PSY.System; kwargs...)
     components = vcat((read(getfield(sys, field))
-                       for field in (:buses, :generators, :loads, :storage, :branches))...)::Vector{EM.ComponentDesc}
+                       for field in (:buses, :generators, :loads, :storage, :branches))...)::Vector{ComponentDesc}
     Data(components; kwargs...)
 end
 
