@@ -1,4 +1,11 @@
-build!(m::EnergyModel) = addto!(m.jumpmodel, m)
+function build!(m::EnergyModel)
+    # Clear jump model
+    empty!(m.jumpobjects)
+    MOI.empty!(backend(m.jumpmodel))
+
+    # Fill it up again
+    addto!(m.jumpmodel, m)
+end
 
 function addto!(jm::JuMP.AbstractModel, m::EnergyModel)
     @info("* Equations for individual devices")
