@@ -61,7 +61,7 @@ abstract type ExpansionModel <: ModelType end
 # If nothing else is said, let's say it's fine
 demote_formulation(::Type{ExpansionModel}, ::Type{DF}) where DF <: ExpansionForm = DF
 demote_formulation(::Type{ExpansionModel}, ::Type{DF}) where DF <: DispatchForm = DF
-demote_formulation(::Type{DispatchModel},  ::Type{DF}) where DF <: DispatchForm = DF
+demote_formulation(::Type{<:DispatchModel},  ::Type{DF}) where DF <: DispatchForm = DF
 
 # An expansion form should demote to its respective DispatchForm
 demote_formulation(::Type{MT}, ::Type{DF}) where {MT <: DispatchModel, DDF, DF <: ExpansionForm{DDF}} = demote_formulation(MT, DDF)
