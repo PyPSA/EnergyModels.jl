@@ -76,8 +76,9 @@ subnetworks(m::EnergyModel) = values(m.subnetworks)
 
 JuMP.optimize!(m::EnergyModel; kwargs...) = optimize!(m.jumpmodel; kwargs...)
 
-Base.show(io::IO, m::EnergyModel) = print(io, typeof(m), " with ", length(m.devices), " devices")
-Base.show(io::IO, d::Device) = print(io, typeof(d), " for class ", d.class)
+Base.show(io::IO, m::EnergyModel) = print(io, typeof(m), " with ", length(axis(m, Bus)), " buses and ", length(m.devices), " devices")
+Base.show(io::IO, c::Component) = print(io, typeof(c), "($(c.class))")
+
 # function Base.show(io::IO, ::MIME"text/plain", d::Device)
 #     println(io, d, " with ")
 #     println(io, "* ", length(d.vars), " variables")
