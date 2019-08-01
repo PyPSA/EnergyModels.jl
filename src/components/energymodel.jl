@@ -2,6 +2,9 @@ function build!(m::EnergyModel)
     # Clear jump model
     empty!(m.jumpobjects)
     MOI.empty!(backend(m.jumpmodel))
+    for vartype in [:fix, :integrality, :lower_bound, :upper_bound, :zero_one]
+        empty!(getfield(m.jumpmodel, Symbol(:variable_to_, vartype)))
+    end
 
     # Fill it up again
     addto!(m.jumpmodel, m)
