@@ -15,10 +15,13 @@ function componentdescription(::Type{T}) where T <: Component
     !isnothing(j) ? componentdescriptions[j] : error("Component type $T has not been registered")
 end
 
-function getdefault(d::Device, attr::Symbol)
-    attrs = attributes(typeof(d))
+function getdefault(c::Component, attr::Symbol)
+    attrs = attributes(typeof(c))
     i = findfirst(isequal(attr), attrs.attribute)
-    !isnothing(i) ? attrs.default[i] : error("Attribute $attr for device $d is not known")
+    isnothing(i) && error("Attribute $attr for component $d is not known")
+    ret = attrs.default[i]
+    ismissing(ret) && error("Attribute $attr for component $c does not have a default")
+    ret
 end
 
 resolve(::Type{Component}, name::Symbol) = componentdescription(name).componenttype
