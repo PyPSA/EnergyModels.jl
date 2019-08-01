@@ -87,7 +87,7 @@ model(c::Component) = c.model
 naming(c::Component) = c.class
 naming(c::Component, args...) = Symbol(naming(c), flatten((:(::), a) for a=args)...)
 
-Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, d::Device) = intersect((findall(pred, d[attr]) for attr = busattributes(d))...)
+Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, d::Device) = intersect((findall(pred, get(d, attr, axis(d))) for attr = busattributes(d))...)
 Base.findall(pred::Base.Fix2{typeof(in), <:Axis}, c::Bus) = findall(pred, axis(c).val)
 
 function Base.getindex(m::EnergyModel, class::Symbol)
@@ -169,6 +169,9 @@ axis(m::SubNetwork, T::Type{<:Component}) = axis(m[T])
 # Could be specialized to not have to retrieve the whole axis (on the other
 # hand, the axis should be cached, anyway)
 Base.length(c::Component) = length(axis(c))
+
+issimple(c::Component) = issimple(model(c).data, naming(c))
+issimple(::SubNetwork) = false
 
 add!(m::EnergyModel, ::Type{T}, class::Symbol; kwargs...) where T <: Component = add!(m, T, Axis{class}([class]); kwargs...)
 add!(m::EnergyModel, ::Type{T}, class::Symbol, names; kwargs...) where T <: Component = add!(m, T, Axis{class}(names); kwargs...)

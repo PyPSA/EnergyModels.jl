@@ -4,6 +4,7 @@ abstract type AbstractNcData <: AbstractData end
 
 gettypeparams(data::AbstractData, c::Component) = nothing
 axis(data::AbstractData, c::Component) = axis(data, naming(c))
+issimple(data::AbstractData, name::Symbol) = false
 
 function components end
 
@@ -135,6 +136,8 @@ function Base.get(data::Data{<:AbstractData}, c::Component, quantity)
 
     !isnothing(ret) ? ret : getdefault(c, quantity)
 end
+
+issimple(data::Data, name::Symbol) = (ax = axis(data, name); length(ax) == 1 && AxisArrays.axisname(ax) == name)
 
 gettypeparams(data::Data{Nothing}, device::Device) = nothing
 gettypeparams(data::Data{<:AbstractData}, device::Device) = gettypeparams(data.fallback, device)
