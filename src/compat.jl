@@ -1,16 +1,20 @@
 import AxisArrays: AxisArray, axisdim, axisnames, axisvalues, CategoricalVector
-using LightGraphs: AbstractSimpleGraph
-using Base: @propagate_inbounds, HasShape, HasEltype
 
 tofloat(x::String) = parse(Float64, x)
 tofloat(x) = float(x)
 
-const typeparsers = Dict("float"=>tofloat, "string"=>identity,
+const typeparsers = Dict("float"=>tofloat, "string"=>Symbol,
                          "int"=>x->parse(Int, x),
                          "bool"=>let d=Dict('t'=>true, 'f'=>false); x->d[first(x)] end)
-const typenames = Dict("float"=>Float64, "string"=>String, "int"=>Int64, "bool"=>Bool)
+const typenames = Dict("float"=>Float64, "string"=>Symbol, "int"=>Int64, "bool"=>Bool)
+const Scalar = Union{Float64,Symbol,Int64,Bool}
 
-astype(typ, x) = ismissing(x) ? missing : typeparsers[typ](x)
+astype(typ::String, x::String) = typeparsers[typ](x)
+astype(typ::String, x) = astype(typenames[typ], x)
+astype(::String, ::Missing) = missing
+astype(::DataType, ::Missing) = missing
+astype(::Type{Symbol}, x) = Symbol(x)
+astype(::Type{T}, x) where T = convert(Union{T,Missing}, x)
 
 # !!Type-piracy!! We should make the case to move these definitions to JuMP
 # Will be difficult as long as they use their one JuMPArray methods!

@@ -59,7 +59,7 @@ function addto!(jm::ModelView, m::EnergyModel, d::PassiveBranch{DF}) where {DF <
 end
 
 ## Lines and Transformers
-effectiveimpedance(d::PassiveBranch) = impedance(d)[d[:carrier] == "DC" ? :r_pu_eff : :x_pu_eff]
+effectiveimpedance(d::PassiveBranch) = impedance(d)[d[:carrier] == :DC ? :r_pu_eff : :x_pu_eff]
 
 phaseshift(d::PassiveBranch) = 0.
 phaseshift(d::Transformer) = gettypeparams(d.model.data, d)[:phase_shift]
@@ -67,20 +67,20 @@ phaseshift(d::Transformer) = gettypeparams(d.model.data, d)[:phase_shift]
 function impedance(d::Line)
     L = axis(d)
     bus_v_nom = d.model[Bus][:v_nom]
-    v_nom = bus_v_nom[convert(Array{Int64}, indexin(d[:bus0], first(axisvalues(bus_v_nom))))]
+    v_nom = bus_v_nom[convert(Array{Int64}, indexin(get(d, :bus0, L), first(axisvalues(bus_v_nom))))]
 
     p = gettypeparams(d.model.data, d)
     if p !== nothing
-        num_parallel = d[:num_parallel]
-        length = d[:length]
+        num_parallel = get(d, :num_parallel, L)
+        length = get(d, :length, L)
 
         # line types
         x = AxisArray(p[:x_per_length] .* length ./ num_parallel, L)
         r = AxisArray(p[:r_per_length] .* length ./ num_parallel, L)
         # b = AxisArray(2pi*1e-9*p[:f_nom]*p[:d_per_length] .* length .* num_parallel, ax)
     else
-        x = d[:x]
-        r = d[:r]
+        x = get(d, :x, L)
+        r = get(d, :r, L)
         # b = d[:b]
     end
 

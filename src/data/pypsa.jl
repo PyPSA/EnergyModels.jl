@@ -4,13 +4,14 @@ using AxisArrays
 using NCDatasets
 using DataFrames
 using CSV
+using Base.Iterators: flatten
 
 using ..EnergyModels
 const EM = EnergyModels
 
 using ..EnergyModels:
     AbstractNcData, pushaxes!, resolve, @consense, Component, Device,
-    DeviceFormulation, attributes, components, typenames, naming
+    DeviceFormulation, attributes, components, naming, astype, typenames
 
 export PypsaNcData
 
@@ -63,7 +64,7 @@ _dimnames(attrdesc::AttrDesc; ds=nothing) = dimnames(ds[attrdesc.pypsaname])[2:e
 function EM.pushaxes!(data::PypsaNcData, cd::ComponentDesc)
     pushaxes!(data, cd.axis, component=cd.name, attribute="primary")
 
-    dims = unique(Iterators.flatten((_dimnames(attrdesc; ds=data.dataset) for attrdesc in values(cd.attributes))))
+    dims = unique(flatten((_dimnames(attrdesc; ds=data.dataset) for attrdesc in values(cd.attributes))))
     for dim in dims
         pushaxes!(data, Axis{Symbol(dim)}(nomissing(data.dataset[dim][:])), component=cd.name, attribute=dim)
     end
@@ -94,17 +95,21 @@ function splitgroup(df, group, attr, attrs...)
 end
 
 AttrDesc(::Type{Val{:single}}, attr, name, ds, attrname, attrname_t, idx, axis) =
-    SingleAttrDesc(convert(Union{typenames[attr[:dtype]],Missing}, haskey(ds, attrname) ?
-        @consense(ds[attrname][:][idx], "$name must be a single value") : attr[:default]))
+    SingleAttrDesc(
+        haskey(ds, attrname) ?
+        astype(attr[:dtype], @consense(ds[attrname][:][idx], "$name must be a single value")) :
+        attr[:default]
+    )
 
-AttrDesc(::Type{Val{:static}}, attr, name, ds, attrname, attrname_t, idx, axis) =
+function AttrDesc(::Type{Val{:static}}, attr, name, ds, attrname, attrname_t, idx, axis)
     haskey(ds, attrname) ?
-    AttrDesc{typenames[attr[:dtype]]}(attrname, idx, attr[:default]) :
-    MissingAttrDesc(attr[:default])
+        AttrDesc{typenames[attr[:dtype]]}(attrname, idx, attr[:default]) :
+        MissingAttrDesc(attr[:default])
+end
 
 function AttrDesc(::Type{Val{:series}}, attr, name, ds, attrname, attrname_t, idx, axis)
     attrname_t_i = attrname_t * "_i"
-    indices_t = haskey(ds, attrname_t_i) ? findall(in(ds[attrname_t_i][:]), axis) : []
+    indices_t = haskey(ds, attrname_t_i) ? findall(in(Symbol.(ds[attrname_t_i][:])), axis) : []
     if length(indices_t) == 0
         AttrDesc(Val{:static}, attr, name, ds, attrname, attrname_t, idx, axis)
     else
@@ -244,7 +249,7 @@ function getcomponents(ds, name; pypsaname=false, withname=true, carrier=true, e
         end
 
     for g in groups
-        axis = Axis{g.name}(nomissing(ds[pypsaname * "_i"][:][g.idx]))
+        axis = Axis{g.name}(Symbol.(nomissing(ds[pypsaname * "_i"][:][g.idx])))
 
         formulation = join(skipmissing([
             exp !== false ? ((coalesce(g.attrs[exp], :fix) == :ext) ? "linexp" : missing) : missing,
@@ -275,12 +280,10 @@ function Base.get(data::PypsaNcData, attrdesc::AttrDesc{T}, ax) where T
     da = data.dataset[attrdesc.pypsaname]
     dims = Symbol.(dimnames(da)[2:end])
 
-    as_dtype(T, a) = convert(Array{T,ndims(a)}, a)
-
     # Benchmarking shows that getting the full array first and then
     # subsetting is faster even if we need to get only 1 or 2 lines
     # We would need to improve NCDatasets first!
-    AxisArray(as_dtype(T, da[:][attrdesc.indices,ntuple(i->:,length(dims))...]),
+    AxisArray(astype.(T, da[:][attrdesc.indices,ntuple(i->:,length(dims))...]),
               ax, (axis(data, n) for n = dims)...)
 end
 

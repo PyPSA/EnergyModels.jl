@@ -47,7 +47,7 @@ axis(data::AbstractNcData, n::Symbol) = Axis{n}(nomissing(data.dataset[String(n)
 struct ComponentDesc
     name::Symbol
     componenttype
-    data::Dict{Symbol,Union{Symbol,Float64,AxisArray}}
+    data::Dict{Symbol,Union{Scalar,AxisArray}}
 end
 ComponentDesc(tup) = ComponentDesc(tup...)
 
