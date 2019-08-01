@@ -28,7 +28,7 @@ ensure_optimizerfactory(::Type{T}) where T <: MOI.AbstractOptimizer = with_optim
 
 function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
                      parent=nothing, jumpmodel=nothing, jumpnames=true, optimizer=nothing) where
-      {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
+        {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
 
     if isnothing(jumpmodel)
         jumpmodel = isnothing(optimizer) ? JuMP.Model() : JuMP.Model(ensure_optimizerfactory(optimizer))
@@ -45,9 +45,31 @@ function EnergyModel(::Type{MT}, ::Type{TF}, data::AbstractData;
                        Dict{Symbol, Dict{Symbol}{Any}}())
 end
 
+function EnergyModel(other::EnergyModel{MT,TF};
+                     modeltype=nothing, transmissionform=nothing,
+                     jumpnames=nothing, kwargs...) where
+        {MT <: ModelType, TF <: PM.AbstractPowerFormulation}
+
+    if isnothing(modeltype) modeltype = MT end
+    if isnothing(transmissionform) transmissionform = TF end
+
+    kwargs = Dict{Symbol,Any}(kwargs)
+    get!(kwargs, :jumpnames, other.jumpnames)
+
+    model = EnergyModel(modeltype, transmissionform, other.data; kwargs...)
+
+    merge!(model.buses, Dict(k=>withmodel(v, model) for (k,v) in other.buses))
+    merge!(model.devices, Dict(k=>withmodel(v, model) for (k,v) in other.devices))
+    merge!(model.axes, other.axes)
+
+    determine_subnetworks!(model)
+
+    model
+end
+
 EnergyModel(; kwargs...) = EnergyModel(Data(); kwargs...)
 EnergyModel(filename; kwargs...) = EnergyModel(load(filename); kwargs...)
-EnergyModel(data::AbstractData; kwargs...) = load(EnergyModel(ExpansionModel, PM.DCPlosslessForm, data; kwargs...))
+EnergyModel(data::AbstractData; modeltype=ExpansionModel, transmissionform=PM.DCPlosslessForm, kwargs...) = load(EnergyModel(modeltype, transmissionform, data; kwargs...))
 
 function load(m::EnergyModel)
     for (class, T) in components(m.data)
@@ -176,6 +198,8 @@ Base.length(c::Component) = length(axis(c))
 
 issimple(c::Component) = issimple(model(c).data, naming(c))
 issimple(::SubNetwork) = false
+
+withmodel(c::T, m::EnergyModel) where T <: Component = T(m, c.class)
 
 add!(m::EnergyModel, ::Type{T}, class::Symbol; kwargs...) where T <: Component = add!(m, T, Axis{class}([class]); kwargs...)
 add!(m::EnergyModel, ::Type{T}, class::Symbol, names; kwargs...) where T <: Component = add!(m, T, Axis{class}(names); kwargs...)
