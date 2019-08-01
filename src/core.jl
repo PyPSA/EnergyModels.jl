@@ -62,6 +62,9 @@ Base.push!(m::EnergyModel, c::SubNetwork) = (m.subnetworks[c.class] = c)
 Base.push!(m::EnergyModel, c::Bus) = (m.buses[c.class] = c)
 Base.push!(m::EnergyModel, ax::Axis{name}) where name = (m.axes[name] = ax)
 
+set_snapshots!(m::EnergyModel, snapshots::AbstractArray) =
+    push!(m, Axis{:snapshots}(collect(snapshots)))
+
 devices(m::EnergyModel) = values(m.devices)
 devices(sn::SubNetwork) = devices(model(sn))
 

@@ -52,9 +52,9 @@ include("containerviews.jl")
 
 include("components/components.jl")
 
-export add!, addto!, build!, optimize!, devices, subnetworks, buses, push!, axis,
-    graph, determine_subnetworks!, jumpmodel, get, getjump, getvalue, getdual,
-    getparam
+export add!, addto!, build!, optimize!, set_snapshots!, devices, subnetworks,
+    buses, push!, axis, graph, determine_subnetworks!, jumpmodel, get, getjump,
+    getvalue, getdual, getparam
 
 # Components and Devices
 export EnergyModel, SubNetwork, Device, Bus, Line, Transformer, Link,
