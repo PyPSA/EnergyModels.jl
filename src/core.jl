@@ -1,20 +1,20 @@
+"Connection points at which energy balance is upheld, has `axis` and `addto!`"
+struct Bus <: Component
+    model::AbstractEnergyModel
+    class::Symbol
+end
+
 "Represents a synchronuous zone. Induced by determine_subnetworks!(model)"
-struct SubNetwork{T <: AbstractEnergyModel} <: Component
-    model::T
+struct SubNetwork <: Component
+    model::AbstractEnergyModel
     class::Symbol
     buses::Axis
 end
 
-"Connection points at which energy balance is upheld, has `axis` and `addto!`"
-struct Bus{T <: AbstractEnergyModel} <: Component
-    model::T
-    class::Symbol
-end
-
 mutable struct EnergyModel{MT <: ModelType, TF <: PM.AbstractPowerFormulation} <: AbstractEnergyModel
     devices::Dict{Symbol,Device}
-    subnetworks::Dict{Symbol,SubNetwork{EnergyModel{MT,TF}}}
-    buses::Dict{Symbol,Bus{EnergyModel{MT,TF}}}
+    subnetworks::Dict{Symbol,SubNetwork}
+    buses::Dict{Symbol,Bus}
     axes::Dict{Symbol,Axis}
     data::AbstractData
     parent::Union{AbstractEnergyModel,Nothing}
