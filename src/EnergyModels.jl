@@ -46,10 +46,10 @@ include("modelview.jl")
 include("wrappedarray.jl")
 include("registry.jl")
 include("graph.jl")
-include("data.jl")
 include("containerviews.jl")
 
 include("components/components.jl")
+include("data.jl")
 
 export add!, addto!, build!, optimize!, set_snapshots!, devices, subnetworks,
     buses, push!, axis, graph, determine_subnetworks!, jumpmodel, get, getjump,

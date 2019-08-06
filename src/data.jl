@@ -144,3 +144,4 @@ gettypeparams(data::Data{<:AbstractData}, device::Device) = gettypeparams(data.f
 
 include("data/pypsa.jl")
 include("data/powersystems.jl")
+include("data/pypsanetwork.jl")
