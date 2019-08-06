@@ -18,7 +18,7 @@ end
 function getdefault(c::Component, attr::Symbol)
     attrs = attributes(typeof(c))
     i = findfirst(isequal(attr), attrs.attribute)
-    isnothing(i) && error("Attribute $attr for component $d is not known")
+    isnothing(i) && error("Attribute $attr for component $c is not known")
     ret = attrs.default[i]
     ismissing(ret) && error("Attribute $attr for component $c does not have a default")
     ret

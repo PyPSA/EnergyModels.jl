@@ -3,10 +3,10 @@ module PowerSystemsData
 import ..EnergyModels
 const EM = EnergyModels
 
-import ..PowerSystems
+import PowerSystems
 const PSY = PowerSystems
 
-import ..TimeSeries
+import TimeSeries
 const TS = TimeSeries
 
 using AxisArrays: AxisArray, Axis, axes

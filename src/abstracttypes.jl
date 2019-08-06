@@ -21,4 +21,5 @@ abstract type Emission <: Expression end
 struct Cost <: Expression end
 struct CO2 <: Emission end
 struct NodalActivePower <: Expression end
+struct NodalReactivePower <: Expression end
 

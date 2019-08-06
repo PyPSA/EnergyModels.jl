@@ -1,8 +1,6 @@
-__precompile__()
-
 module EnergyModels
 
-using Requires
+# using Requires
 using CSV
 using Destruct
 using JuMP
@@ -33,8 +31,9 @@ using Base.Iterators: flatten
 # end
 
 function __init__()
-    @require TimeSeries="9e3dc215-6440-5c97-bce1-76c03772f85e" nothing
-    @require PowerSystems="bcd98974-b02a-5e2f-9ee0-a103f5c450dd" include("data/powersystems.jl")
+    # @require TimeSeries="9e3dc215-6440-5c97-bce1-76c03772f85e" nothing
+    # @require PowerSystems="bcd98974-b02a-5e2f-9ee0-a103f5c450dd" include("data/powersystems.jl")
+    # @require PyCall="438e738f-606a-5dbb-bf0a-cddfbfd45ab0" include("data/pypsanetwork.jl")
 end
 
 include("abstracttypes.jl")
@@ -61,4 +60,7 @@ export EnergyModel, SubNetwork, Device, Bus, Line, Transformer, Link,
     Load, Generator, StorageUnit, Store, Branch, PassiveBranch, ActiveBranch,
     OnePort
 
+# TODO Generate a precompile file with SnoopCompiler
+
 end # module
+

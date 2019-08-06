@@ -143,3 +143,4 @@ gettypeparams(data::Data{Nothing}, device::Device) = nothing
 gettypeparams(data::Data{<:AbstractData}, device::Device) = gettypeparams(data.fallback, device)
 
 include("data/pypsa.jl")
+include("data/powersystems.jl")
