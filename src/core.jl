@@ -87,6 +87,16 @@ Base.push!(m::EnergyModel, ax::Axis{name}) where name = (m.axes[name] = ax)
 set_snapshots!(m::EnergyModel, snapshots::AbstractArray) =
     push!(m, Axis{:snapshots}(collect(snapshots)))
 
+with_model(d::Device, DF::DeviceFormulation) = with_formulation(d, DF)
+with_model(d::Device, ::Type{T}) where T <: Device = model()
+function set_formulation!(m::EnergyModel, changes::Pair...)
+    for (selector, newmodel) in changes
+        for d in devices(m, selector)
+            push!(m, with_formulation(d, newmodel))
+        end
+    end
+end
+
 store_results!(m::EnergyModel) = store_results!(m.data, m)
 
 devices(m::EnergyModel) = values(m.devices)
@@ -117,6 +127,8 @@ end
 
 model(m::EnergyModel) = m
 model(c::Component) = c.model
+modeltype(m::EnergyModel{MT,TF}) where {MT <: ModelType, TF <: PM.AbstractPowerFormulation} = MT
+transmissionform(m::EnergyModel{MT,TF}) where {MT <: ModelType, TF <: PM.AbstractPowerFormulation} = TF
 
 naming(c::Component) = c.class
 naming(c::Component, args...) = Symbol(naming(c), flatten((:(::), a) for a=args)...)
