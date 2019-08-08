@@ -1,4 +1,5 @@
 import AxisArrays: AxisArray, axisdim, axisnames, axisvalues, CategoricalVector
+using JuMP.Containers: DenseAxisArray
 
 tofloat(x::String) = parse(Float64, x)
 tofloat(x) = float(x)
@@ -38,6 +39,7 @@ end
 
 # AxisArray(A::JuMPArray) = AxisArray(A.innerArray, A.indexsets...)
 AxisArray(A::JuMP.Containers.DenseAxisArray) = AxisArray(A.data, A.axes...)
+JuMP.Containers.DenseAxisArray(A::AxisArray) = DenseAxisArray(A.data, AxisArrays.axes(A)...)
 
 function _shiftamt(A, shifts::Pair{Symbol,T}...) where T<:Integer
     amt = zeros(T, ndims(A))
@@ -48,7 +50,7 @@ function _shiftamt(A, shifts::Pair{Symbol,T}...) where T<:Integer
 end
 
 Base.circshift(A::AxisArray, shifts::Pair{Symbol,<:Integer}...) = circshift(A, _shiftamt(A, shifts...))
-function Base.circshift(A::Containers.DenseAxisArray, shifts::Pair{Symbol,<:Integer}...)
+function Base.circshift(A::DenseAxisArray, shifts::Pair{Symbol,<:Integer}...)
     JuMP.Containers.DenseAxisArray(circshift(A.data, _shiftamt(A, shifts...)), A.axes...)
 end
 
