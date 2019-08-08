@@ -87,6 +87,8 @@ Base.push!(m::EnergyModel, ax::Axis{name}) where name = (m.axes[name] = ax)
 set_snapshots!(m::EnergyModel, snapshots::AbstractArray) =
     push!(m, Axis{:snapshots}(collect(snapshots)))
 
+store_results!(m::EnergyModel) = store_results!(m.data, m)
+
 devices(m::EnergyModel) = values(m.devices)
 devices(sn::SubNetwork) = devices(model(sn))
 
@@ -100,6 +102,12 @@ JuMP.optimize!(m::EnergyModel; kwargs...) = optimize!(m.jumpmodel; kwargs...)
 
 Base.show(io::IO, m::EnergyModel) = print(io, typeof(m), " with ", length(axis(m, Bus)), " buses and ", length(m.devices), " devices")
 Base.show(io::IO, c::Component) = print(io, typeof(c), "($(c.class))")
+function Base.show(io::IO, c::Device{DF}) where DF <: DeviceFormulation
+    print(io, typeof(c), "($(c.class))")
+    demoted_DF = demote_formulation(modeltype(model(c)), DF)
+    demoted_DF != DF && print(io, " (demoted to $demoted_DF)")
+end
+
 
 # function Base.show(io::IO, ::MIME"text/plain", d::Device)
 #     println(io, d, " with ")
