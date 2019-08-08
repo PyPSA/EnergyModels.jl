@@ -37,15 +37,15 @@ version = "0.5.6"
 
 [[CSTParser]]
 deps = ["Tokenize"]
-git-tree-sha1 = "0ff80f68f55fcde2ed98d7b24d7abaf20727f3f8"
+git-tree-sha1 = "c69698c3d4a7255bc1b4bc2afc09f59db910243b"
 uuid = "00ebfdb7-1f24-5e51-bd34-a7502290713f"
-version = "0.6.1"
+version = "0.6.2"
 
 [[CSV]]
 deps = ["CategoricalArrays", "DataFrames", "Dates", "Mmap", "Parsers", "PooledArrays", "Profile", "Tables", "Unicode", "WeakRefStrings"]
-git-tree-sha1 = "a7df9250dff3aba96436580dd6ac00d712364cab"
+git-tree-sha1 = "35205137ee2f5a9c1f358407e9ed0f1a17878919"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-version = "0.5.9"
+version = "0.5.11"
 
 [[Calculus]]
 deps = ["Compat"]
@@ -60,10 +60,10 @@ uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 version = "0.5.5"
 
 [[CodecZlib]]
-deps = ["BinaryProvider", "Libdl", "Test", "TranscodingStreams"]
-git-tree-sha1 = "36bbf5374c661054d41410dc53ff752972583b9b"
+deps = ["BinaryProvider", "Libdl", "TranscodingStreams"]
+git-tree-sha1 = "05916673a2627dd91b4969ff8ba6941bc85a960e"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
-version = "0.5.2"
+version = "0.6.0"
 
 [[Codecs]]
 deps = ["Test"]
@@ -96,9 +96,9 @@ uuid = "a9693cdc-2bc8-5703-a9cd-1da358117377"
 version = "0.1.0"
 
 [[DataAPI]]
-git-tree-sha1 = "891a09f4f90361a28d0391c104a65c0202e22624"
+git-tree-sha1 = "8903f0219d3472543fc4b2f5ebaf675a07f817c0"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
-version = "1.0.0"
+version = "1.0.1"
 
 [[DataFrames]]
 deps = ["CategoricalArrays", "Compat", "DataAPI", "InvertedIndices", "IteratorInterfaceExtensions", "Missings", "PooledArrays", "Printf", "REPL", "Reexport", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
@@ -183,7 +183,9 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[Gurobi]]
 deps = ["Libdl", "LinearAlgebra", "MathOptInterface", "MathProgBase", "OrderedCollections", "SparseArrays"]
-path = "/home/coroa/.julia/dev/Gurobi"
+git-tree-sha1 = "64841569df03431009f9403fb2351eed466f6e2f"
+repo-rev = "od/moi9"
+repo-url = "https://github.com/JuliaOpt/Gurobi.jl"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
 version = "0.8.0"
 
@@ -239,7 +241,9 @@ version = "0.21.0"
 
 [[JuMP]]
 deps = ["Calculus", "DataStructures", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "NaNMath", "Random", "SparseArrays", "Statistics"]
-path = "/home/coroa/.julia/dev/JuMP"
+git-tree-sha1 = "adfb1c960560f186161a45bb49048c8d467b79bd"
+repo-rev = "moi09"
+repo-url = "https://github.com/coroa/JuMP.jl"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
 version = "0.19.2"
 
@@ -280,7 +284,9 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MathOptInterface]]
 deps = ["BenchmarkTools", "LinearAlgebra", "OrderedCollections", "SparseArrays", "Test", "Unicode"]
-path = "/home/coroa/.julia/dev/MathOptInterface"
+git-tree-sha1 = "86dee5374810ef0fd0ee860b53b8fa7c496332d3"
+repo-rev = "master"
+repo-url = "https://github.com/JuliaOpt/MathOptInterface.jl"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 version = "0.9.0"
 
@@ -358,9 +364,11 @@ version = "0.5.2"
 
 [[PowerModels]]
 deps = ["InfrastructureModels", "JSON", "JuMP", "LinearAlgebra", "MathOptInterface", "Memento", "SparseArrays"]
-path = "/home/coroa/.julia/dev/PowerModels"
+git-tree-sha1 = "d74f78610eb075b3ba06df0e47b1bbe48bf993a5"
+repo-rev = "master"
+repo-url = "https://github.com/coroa/PowerModels.jl"
 uuid = "c36e90e8-916a-50a6-bd94-075b64ef4655"
-version = "0.12.1"
+version = "0.12.2"
 
 [[PowerSystems]]
 deps = ["AxisArrays", "CSV", "DataFrames", "Dates", "InteractiveUtils", "JSON", "LinearAlgebra", "Logging", "SparseArrays", "TimeSeries", "YAML"]
