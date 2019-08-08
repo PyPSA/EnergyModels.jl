@@ -1,0 +1,12 @@
+[deps]
+AxisArrays = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+EnergyModels = "411f25fd-c8c8-5884-8d62-1a208e38aa34"
+Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+Pandas = "eadc2687-ae89-51f9-a5d9-86b5a6373a9c"
+PowerModels = "c36e90e8-916a-50a6-bd94-075b64ef4655"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
