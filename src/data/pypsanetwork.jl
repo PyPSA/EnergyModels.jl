@@ -17,7 +17,9 @@ using ..EnergyModels:
     AbstractData, Data, pushaxes!, resolve, @consense, Component, Device,
     DeviceFormulation, attributes, components, naming, astype, typenames
 
-using JuMP: value, dual, ConstraintRef, VariableRef, GenericAffExpr
+import ..EnergyModels: store_results!
+
+using JuMP: value, dual, ConstraintRef, VariableRef, GenericAffExpr, LowerBoundRef, UpperBoundRef
 
 export PypsaNetworkData
 
@@ -116,6 +118,7 @@ attributedescriptions(name, df, pnl, idx, axis; attributes=nothing) =
 function typeparamdescriptions(name, df, indices; types=nothing)
     isnothing(types) && return nothing
     typename = @consense(PD.values(df.type)[indices], "$name may not have more than one type")
+    typename == "" && return nothing
     typ = types[types.name .== typename, :]
     Dict(c => typ[1, c] for c in names(typ) if c != :name)
 end
@@ -311,24 +314,41 @@ function store_results!(data::PypsaNetworkData, s::EM.Store)
 end
 
 function store_results!(data::PypsaNetworkData, l::EM.Load)
-    _set!(data.network.loads_t["p"], transpose(l[:p_set]))
+    m = EM.model(l)
+    T = axis(m, :snapshots)
+    L = axis(m, l)
+    # TODO: FIX
+    # _set!(data.network.loads_t["p"], EM.get(l, :p_set, L, T))
 end
 
+function _pypsaname(::Type{T}) where T<:EM.Component
+    S = T
+    while !(S isa Symbol)
+        S = S.name
+    end
+    string(S)
+end
+
+_mu_lower(b::EM.Branch{DF}) where DF <: EM.ExpansionForm = b[:p_lower]
+_mu_lower(b::EM.Branch{DF}) where DF <: EM.DispatchForm = AxisArray(LowerBoundRef.(b[:p]), AxisArrays.axes(b[:p])...)
+_mu_upper(b::EM.Branch{DF}) where DF <: EM.ExpansionForm = l[:p_upper]
+_mu_upper(b::EM.Branch{DF}) where DF <: EM.DispatchForm = AxisArray(UpperBoundRef.(b[:p]), AxisArrays.axes(b[:p])...)
+
 function store_results!(data::PypsaNetworkData, b::T) where T <: EM.PassiveBranch
-    pnl = data.network.pnl(string(T.name))
+    pnl = data.network.pnl(_pypsaname(T))
     _set!(pnl["p0"], b[:p])
     _set!(pnl["p1"], -1, b[:p])
-    _set!(pnl["mu_lower"], b[:p_lower])
-    _set!(pnl["mu_upper"], -1, b[:p_upper])
-    _set!(data.network.df(string(T.name)).s_nom_opt, b[:s_nom])
+    _set!(pnl["mu_lower"], _mu_lower(b))
+    _set!(pnl["mu_upper"], -1, _mu_upper(b))
+    _set!(data.network.df(_pypsaname(T)).s_nom_opt, b[:s_nom])
 end
 
 function store_results!(data::PypsaNetworkData, l::EM.Link)
     pnl = data.network.links_t
     _set!(pnl["p0"], l[:p])
     _set!(pnl["p1"], AxisArray(- l[:efficiency], AxisArrays.axes(l[:efficiency])...), l[:p])
-    _set!(pnl["mu_lower"], l[:p_lower])
-    _set!(pnl["mu_upper"], -1, l[:p_upper])
+    _set!(pnl["mu_lower"], _mu_lower(l))
+    _set!(pnl["mu_upper"], -1, _mu_upper(l))
 end
 
 function store_results!(data::PypsaNetworkData, b::EM.Bus)
