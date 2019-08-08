@@ -1,4 +1,7 @@
 function build!(m::EnergyModel)
+    # If subnetworks are not set, compute them
+    isempty(m.subnetworks) && determine_subnetworks!(m)
+
     # Clear jump model
     empty!(m.jumpobjects)
     MOI.empty!(backend(m.jumpmodel))
