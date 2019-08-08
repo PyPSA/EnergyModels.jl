@@ -104,6 +104,7 @@ function Base.push!(data::Data, cd::ComponentDesc, ax::Axis{name,Array{Symbol,1}
     pushaxes!(data, cd)
 end
 
+_as_axisarrays(d::Dict{Symbol}{T}) where T <: Union{Scalar,AxisArray} = d
 Base.push!(data::Data, ::Type{T}, ax::Axis{name}; parameters...) where {name,T <: Component} =
     push!(data, ComponentDesc(name, T, Dict(parameters)), ax)
 
@@ -137,11 +138,14 @@ function Base.get(data::Data{<:AbstractData}, c::Component, quantity)
     !isnothing(ret) ? ret : getdefault(c, quantity)
 end
 
+store_results!(::AbstractData, model) = error("Not implemented")
+store_results!(data::Data{<:AbstractData}, model) = store_results!(data.fallback, model)
+
 issimple(data::Data, name::Symbol) = (ax = axis(data, name); length(ax) == 1 && AxisArrays.axisname(ax) == name)
 
 gettypeparams(data::Data{Nothing}, device::Device) = nothing
 gettypeparams(data::Data{<:AbstractData}, device::Device) = gettypeparams(data.fallback, device)
 
-include("data/pypsa.jl")
-include("data/powersystems.jl")
-include("data/pypsanetwork.jl")
+include("pypsa.jl")
+include("powersystems.jl")
+include("pypsanetwork.jl")

@@ -49,7 +49,7 @@ include("graph.jl")
 include("containerviews.jl")
 
 include("components/components.jl")
-include("data.jl")
+include("data/data.jl")
 
 export add!, addto!, build!, optimize!, set_snapshots!, devices, subnetworks,
     buses, push!, axis, graph, determine_subnetworks!, jumpmodel, get, getjump,
