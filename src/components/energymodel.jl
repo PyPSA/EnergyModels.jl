@@ -14,20 +14,20 @@ function build!(m::EnergyModel)
 end
 
 function addto!(jm::JuMP.AbstractModel, m::EnergyModel)
-    @info("* Equations for individual devices")
+    # @info("* Equations for individual devices")
     for d = devices(m)
-        @info("  - $(naming(d)) ($(naming(typeof(d))))")
+        # @info("  - $(naming(d)) ($(naming(typeof(d))))")
         addto!(jm, m, d)
     end
-    @info("* Equations for energy balance")
+    # @info("* Equations for energy balance")
     for d = buses(m)
         addto!(jm, m, d)
     end
-    @info("* Equations for subnetworks")
+    # @info("* Equations for subnetworks")
     for sn = subnetworks(m)
         addto!(jm, m, sn)
     end
-    @info("* Cost minimization objective")
+    # @info("* Cost minimization objective")
     @objective(jm, Min, sum(cost(d) for d = devices(m)))
 
     jm
